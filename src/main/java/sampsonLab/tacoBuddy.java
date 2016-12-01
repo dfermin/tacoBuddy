@@ -41,10 +41,13 @@ public class tacoBuddy {
         the_vcf_parser = new VCFParser(globals.inputVCF, globals.inputVCF_tabix);
 
         if(globals.DOM_geneMap.size() > 0) the_vcf_parser.parse(globals.DOM_geneMap);
+        if(globals.REC_geneMap.size() > 0) the_vcf_parser.parse(globals.REC_geneMap);
+
 
         // This command only works if you have the tabix tbi file for the input VCF
         VCFFileReader vcfr = new VCFFileReader(globals.inputVCF, globals.inputVCF_tabix);
 
+        System.exit(0);
 
         CloseableIterator<VariantContext> it = vcfr.iterator();
         while(it.hasNext()) {

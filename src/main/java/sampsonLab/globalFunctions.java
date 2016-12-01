@@ -1,11 +1,12 @@
 package sampsonLab;
 
-import org.apache.commons.cli.HelpFormatter;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Multiset;
+import com.google.common.collect.SetMultimap;
 
 import java.io.*;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.zip.GZIPInputStream;
 
 
@@ -25,7 +26,7 @@ public class globalFunctions {
     static Set<String> genesREC = null;
     static double popFilter = 0.01; // default value
     static String tsOutputModel = null;
-    static HashMap<String, Gene> REC_geneMap = null, DOM_geneMap = null;
+    static public SetMultimap<String, Transcript> REC_geneMap = null, DOM_geneMap = null;
 
     static public void parseCommandLineArgs(String[] args) throws IOException {
         File paramF = null;
@@ -176,8 +177,8 @@ public class globalFunctions {
 
     public void parseGFF3() throws IOException {
 
-        REC_geneMap = new HashMap<String, Gene>();
-        DOM_geneMap = new HashMap<String, Gene>();
+        REC_geneMap = HashMultimap.create(); // k = geneName, v = list of transcripts
+        DOM_geneMap = HashMultimap.create(); // k = geneName, v = list of transcripts
         BufferedReader br = null;
 
         System.err.print("\nParsing " + srcGFF3.getName() + "\n");
@@ -191,23 +192,64 @@ public class globalFunctions {
             br = new BufferedReader(fr);
         }
 
-        String line;
-        Gene curGene = null;
+        Transcript curTranscript = null;
+        int geneStart = -1, geneEnd = -1;
+        char strand = '.';
+        String geneID = null, geneType = null, geneName = null, chr = null, line = null;
+
         while((line = br.readLine()) != null) {
             if(line.startsWith("#")) continue;
 
-            curGene = new Gene(line);
-            if(curGene.isValidGene()) {
-                String k = curGene.getGeneName();
-                if (genesDOM.contains(k)) DOM_geneMap.put(k, curGene);
-                else if (genesREC.contains(k)) REC_geneMap.put(k, curGene);
+            String[] data = line.split("\t");
+            if(data[2].equalsIgnoreCase("gene")) {
+                chr = data[0];
+                geneStart = Integer.parseInt(data[3]);
+                geneEnd = Integer.parseInt(data[4]);
+                strand = data[6].charAt(0);
+
+
+                String info[] = data[8].split(";");
+                for (String s : info) {
+                    if (s.startsWith("ID=")) geneID = s.substring(3);
+                    if (s.startsWith("gene_type=")) geneType = s.substring(10);
+                    if (s.startsWith("gene_name=")) geneName = s.substring(10);
+                }
             }
-            curGene = null;
+
+            if(data[2].equalsIgnoreCase("transcript")) {
+                int start = Integer.parseInt(data[3]);
+                int end = Integer.parseInt(data[4]);
+
+                String localGeneName = null, transID = null;
+
+                String info[] = data[8].split(";");
+                for (String s : info) {
+                    if (s.startsWith("ID=")) transID = s.substring(3);
+                    if (s.startsWith("gene_name=")) localGeneName = s.substring(10);
+                }
+
+                if (!localGeneName.equalsIgnoreCase(geneName)) {
+                    System.err.print("\nERROR!: " + localGeneName + " != " + geneName + " for current line of srcGFF3:\n" +
+                            line + "\n\n");
+                    System.exit(0);
+                }
+
+                // Create a new transcript entry
+                curTranscript = new Transcript(chr,
+                        geneStart, geneEnd,
+                        strand, geneID, geneType, geneName,
+                        start, end, transID);
+
+                if(genesDOM.contains(geneName)) { DOM_geneMap.put(geneName, curTranscript); }
+                else if(genesREC.contains(geneName)) { REC_geneMap.put(geneName, curTranscript); }
+
+                curTranscript = null;
+            }
         }
         br.close();
 
         System.err.print(
-                "DOM gene map size: " + DOM_geneMap.size() +
-                "\nREC gene map size: " + REC_geneMap.size() + "\n");
+                "DOM gene map size: " + DOM_geneMap.asMap().size() +
+                "\nREC gene map size: " + REC_geneMap.asMap().size() + "\n");
     }
 }
