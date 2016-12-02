@@ -51,34 +51,32 @@ public class tacoBuddy {
 
 
 
-//        // This command only works if you have the tabix tbi file for the input VCF
-//        VCFFileReader vcfr = new VCFFileReader(globals.inputVCF, globals.inputVCF_tabix);
-//
-//        System.exit(0);
-//
-//        CloseableIterator<VariantContext> it = vcfr.iterator();
-//        while(it.hasNext()) {
-//            VariantContext vc = it.next();
-//            String contig = vc.getContig(); // this should be the chromosome
-//            int pos = vc.getEnd(); // position of the variant in the genome
-//            String ref = vc.getReference().getDisplayString(); // get the reference Allele nucleotide
-//            String alt = vc.getAltAlleleWithHighestAlleleCount().getDisplayString();
-//
-//            System.out.print("-------------------------------------------\n");
-//            System.out.print("chr" + contig + ":" + pos + ref + ">" + alt + "\t" + vc.getID() + "\n");
-//
-//            /**/
-//            Map<String, Object> M = vc.getAttributes();
-//            for (String k: M.keySet()) {
-//                System.out.print(k + "\n");
-//
-//            }
-//            /**/
-//            System.out.print("-------------------------------------------\n");
-//            break;
-//        }
-//
-//        vcfr.close();
+        // This command only works if you have the tabix tbi file for the input VCF
+        VCFFileReader vcfr = new VCFFileReader(globals.inputVCF, globals.inputVCF_tabix);
+
+        CloseableIterator<VariantContext> it = vcfr.iterator();
+        while(it.hasNext()) {
+            VariantContext vc = it.next();
+            String contig = vc.getContig(); // this should be the chromosome
+            int pos = vc.getEnd(); // position of the variant in the genome
+            String ref = vc.getReference().getDisplayString(); // get the reference Allele nucleotide
+            String alt = vc.getAltAlleleWithHighestAlleleCount().getDisplayString();
+
+            System.out.print("-------------------------------------------\n");
+            System.out.print("chr" + contig + ":" + pos + ref + ">" + alt + "\t" + vc.getID() + "\n");
+
+            /**/
+            Map<String, Object> M = vc.getAttributes();
+            for (String k: M.keySet()) {
+                System.out.print(k + "\n");
+
+            }
+            /**/
+            System.out.print("-------------------------------------------\n");
+            break;
+        }
+
+        vcfr.close();
     }
 
 }

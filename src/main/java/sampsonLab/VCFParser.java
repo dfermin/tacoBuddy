@@ -5,13 +5,13 @@ import htsjdk.samtools.util.CloseableIterator;
 import htsjdk.variant.variantcontext.Genotype;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.vcf.VCFFileReader;
+import htsjdk.variant.vcf.VCFHeader;
+import htsjdk.variant.vcf.VCFInfoHeaderLine;
 
 import java.io.File;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.Set;
 
@@ -35,6 +35,7 @@ public class VCFParser {
         vcList = new ArrayList<VariantContext>();
         String q = null;
         Statement stmt = null;
+        PreparedStatement prep = null;
 
         String DBfileName = "jdbc:hsqldb:file:" + (new File("VCFDB")).getAbsolutePath() + ";shutdown=true"; // just down the DB when last connection is closed
 
@@ -46,7 +47,12 @@ public class VCFParser {
         try {
 
             conn = DriverManager.getConnection(DBfileName, "SA", "");
-            q = "CREATE TABLE rawd (" +
+            stmt = conn.createStatement();
+            stmt.executeUpdate("DROP TABLE IF EXISTS rawd");
+            stmt.execute("SET FILES LOG FALSE");
+            stmt.execute("SET FILES NIO SIZE 2048");
+
+            q = "CREATE CACHED TABLE rawd (" +
                     "gene_id VARCHAR(50), " +
                     "trans_id VARCHAR(50), " +
                     "exon_id VARCHAR(50), " +
@@ -55,22 +61,34 @@ public class VCFParser {
                     "dbSNPid VARCHAR(20), " +
                     "svmProb DOUBLE, " +
                     "sampleId VARCHAR(50), " +
-                    "GT VARCHAR(10), " +
+                    "GT VARCHAR(50), " +
                     "DP INTEGER, " +
                     "GQ INTEGER )";
-
-            stmt = conn.createStatement();
             stmt.executeUpdate(q);
 
         } catch (SQLException e) {
             e.printStackTrace();
         }
 
+        q = "INSERT INTO rawd (gene_id, trans_id, exon_id, exonNum, variant, dbSNPid, svmProb, sampleId, GT, DP, GQ) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ";
+        prep = conn.prepareStatement(q);
+
         // This command only works if you have the tabix tbi file for the input VCF
         VCFFileReader vcfr = new VCFFileReader(inputVCF, inputVCF_tabix);
 
-        // Iterate over the genes in the given geneMap
-        for(String geneId: geneMap.keySet()) {
+
+        VCFHeader hdr = vcfr.getFileHeader();
+        Collection<VCFInfoHeaderLine> H = hdr.getInfoHeaderLines();
+        for(VCFInfoHeaderLine h : H) {
+            System.out.println(h.getID() + "\t" + h. h.getDescription());
+        }
+        System.exit(0);
+
+
+
+        int ctr = 1;
+        for(String geneId: geneMap.keySet()) { // Iterate over the genes in the given geneMap
 
             Set<Transcript> allTS = geneMap.get(geneId);
 
@@ -85,14 +103,7 @@ public class VCFParser {
                             curE.exonStart,
                             curE.exonEnd);
 
-//                    while(it.hasNext()) {
-//                        VariantContext vc = it.next();
-//                        vcList.add( vc );
-//                    }
-
-                    //debugging
                     while(it.hasNext()) {
-
                         VariantContext vc = it.next();
                         String chr = vc.getContig();
                         int pos = vc.getEnd();
@@ -101,44 +112,46 @@ public class VCFParser {
                         String alt = vc.getAltAlleleWithHighestAlleleCount().getDisplayString();
                         String dbSNP_id = vc.getID();
 
-                        Genotype G = vc.getGenotype(0);
+                        int N = vc.getNSamples();
+                        for(int i = 0; i < vc.getNSamples(); i++) { // iterate over the samples
+                            Genotype G = vc.getGenotype(i);
 
 
-                        q = "INSERT INTO rawd (" +
-                            " gene_id, " +
-                            " trans_id, " +
-                            " exon_id, " +
-                            " exonNum, " +
-                            " variant, " +
-                            " dbSNPid, " +
-                            " svmProb, " +
-                            " sampleId, " +
-                            " GT, DP, GQ) VALUES ( ";
+                            String variantStr = chr + ":" + pos + ref + ">" + alt;
 
-                        q +=  "'" + curTS.getGeneName() + "', " +
-                                "'" + curTS.getTranscriptID() + "', " +
-                                "'" + curE.exonID + "', " +
-                                    + curE.exonNumber + ", " +
-                                "'" + chr + ":" + pos + ref + ">" + alt + "', " +
-                                "'" + dbSNP_id + "', " +
-                                    + svmProb + ", " +
-                                "'" + G.getSampleName() + "', " +
-                                "'" + G.getGenotypeString() + "', " +
-                                    + G.getDP() + ", " +
-                                    + G.getGQ() + ")";
+                            prep.setString(1, curTS.getGeneName() );
+                            prep.setString(2, curTS.getTranscriptID() );
+                            prep.setString(3, curE.exonID );
+                            prep.setInt(4, curE.exonNumber );
+                            prep.setString(5, variantStr );
+                            prep.setString(6, dbSNP_id );
+                            prep.setDouble(7, svmProb );
+                            prep.setString(8, G.getSampleName() );
+                            prep.setString(9, G.getGenotypeString() );
+                            prep.setInt(10, G.getDP() );
+                            prep.setInt( 11, G.getGQ() );
 
-                        stmt.executeUpdate(q);
-                        conn.commit();
+                            prep.addBatch();
+
+                            if( (ctr%10000) == 0 ) {
+                                conn.setAutoCommit(false);
+                                prep.executeBatch();
+                                conn.setAutoCommit(true);
+                                prep.clearBatch();
+                            }
+                            ctr++;
+                        }
                     }
                 }
             }
         }
         vcfr.close();
+        conn.commit();
+
+        stmt.execute("SET FILES LOG TRUE");
 
         stmt.close();
         conn.close();
-
-        System.err.print("Parsed " + inputVCF.getName() + ", " + vcList.size() + " variant calls kept.\n");
     }
 
 
