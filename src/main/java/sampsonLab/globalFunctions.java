@@ -202,6 +202,7 @@ public class globalFunctions {
 
             String[] data = line.split("\t");
             if(data[2].equalsIgnoreCase("gene")) {
+
                 chr = data[0];
                 geneStart = Integer.parseInt(data[3]);
                 geneEnd = Integer.parseInt(data[4]);
@@ -217,6 +218,15 @@ public class globalFunctions {
             }
 
             if(data[2].equalsIgnoreCase("transcript")) {
+
+                // Check to see if curTranscript is null, if it isn't you need to store this variable
+                // before you can continue;
+                if(curTranscript != null) {
+                    if(genesDOM.contains(geneName)) { DOM_geneMap.put(geneName, curTranscript); }
+                    else if(genesREC.contains(geneName)) { REC_geneMap.put(geneName, curTranscript); }
+                    curTranscript = null;
+                }
+
                 int start = Integer.parseInt(data[3]);
                 int end = Integer.parseInt(data[4]);
 
@@ -229,7 +239,7 @@ public class globalFunctions {
                 }
 
                 if (!localGeneName.equalsIgnoreCase(geneName)) {
-                    System.err.print("\nERROR!: " + localGeneName + " != " + geneName + " for current line of srcGFF3:\n" +
+                    System.err.print("\nERROR! (transcript): " + localGeneName + " != " + geneName + " for current line of srcGFF3:\n" +
                             line + "\n\n");
                     System.exit(0);
                 }
@@ -239,11 +249,37 @@ public class globalFunctions {
                         geneStart, geneEnd,
                         strand, geneID, geneType, geneName,
                         start, end, transID);
+            }
 
-                if(genesDOM.contains(geneName)) { DOM_geneMap.put(geneName, curTranscript); }
-                else if(genesREC.contains(geneName)) { REC_geneMap.put(geneName, curTranscript); }
 
-                curTranscript = null;
+            if(data[2].equalsIgnoreCase("exon")) {
+                int start = Integer.parseInt(data[3]);
+                int end = Integer.parseInt(data[4]);
+
+                String transID = null, exonID = null;
+                int exonNum = 0;
+                String info[] = data[8].split(";");
+                for (String s : info) {
+                    if (s.startsWith("Parent=")) transID = s.substring(7);
+                    if (s.startsWith("exon_id=")) exonID = s.substring(8);
+                    if (s.startsWith("exon_number=")) exonNum = Integer.parseInt(s.substring(12));
+                }
+
+                if(!transID.equalsIgnoreCase(curTranscript.getTranscriptID())) {
+                    System.err.print("\nERROR! (exon): " + transID + " != " + curTranscript.getTranscriptID() + " for current line of srcGFF3:" +
+                            line + "\n\n");
+                    System.exit(0);
+                }
+
+                Exon E = new Exon(exonID,
+                        curTranscript.getGeneName(),
+                        curTranscript.getChrom(),
+                        start, end, exonNum
+                        );
+
+                curTranscript.addExon(E);
+                E = null;
+
             }
         }
         br.close();

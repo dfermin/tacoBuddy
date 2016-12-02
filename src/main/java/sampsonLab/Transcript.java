@@ -1,6 +1,6 @@
 package sampsonLab;
 
-import java.util.HashMap;
+import java.util.HashSet;
 
 /**
  * Created by dfermin on 11/30/16.
@@ -20,6 +20,7 @@ public class Transcript {
     private String geneName = null;
     private String transcriptID = null;
 
+    private HashSet<Exon> exonsSet = null;
 
     public Transcript(String ch,
                       int geneS, int geneE,
@@ -37,6 +38,8 @@ public class Transcript {
         startPos = tsS;
         endPos = tsE;
         transcriptID = tsID;
+
+        exonsSet = new HashSet<Exon>();
     }
 
 
@@ -47,11 +50,17 @@ public class Transcript {
     public int get_ts_End() { return endPos; }
     public int get_gene_Start() { return geneStart; }
     public int get_gene_End() { return geneEnd; }
+    public int getNumExons() { return exonsSet.size(); }
+    public void addExon(sampsonLab.Exon e) { exonsSet.add(e); }
+
+    public HashSet<sampsonLab.Exon> getAllExons() { return exonsSet; }
 
     public String getTrimmedChrom() {
         String ret = chromosome.replace("chr", "");
         return(ret);
     }
+
+
 
 
     @Override
