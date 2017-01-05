@@ -26,6 +26,7 @@ public class tacoBuddy {
     static VCFParser the_vcf_parser;
     static ArrayList<JRSUIConstants.Variant> DOM_var = null, REC_var = null;
 
+
     public static void main(String[] args) throws IOException, ParseException, SQLException {
 
         // Prepare the globals object to handle user input

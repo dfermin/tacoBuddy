@@ -81,7 +81,7 @@ public class VCFParser {
         VCFHeader hdr = vcfr.getFileHeader();
         Collection<VCFInfoHeaderLine> H = hdr.getInfoHeaderLines();
         for(VCFInfoHeaderLine h : H) {
-            System.out.println(h.getID() + "\t" + h. h.getDescription());
+            System.out.println(h.getID() + "\t" + h.getDescription());
         }
         System.exit(0);
 

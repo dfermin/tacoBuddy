@@ -6,7 +6,7 @@ package sampsonLab;
 
 
 
-public class Exon {
+public class Exon implements Comparable<Exon> {
     String exonID;
     String geneName;
     String chromosome;
@@ -31,6 +31,11 @@ public class Exon {
         if( this.exonID.equalsIgnoreCase(Other.exonID) ) ret = true;
 
         return ret;
+    }
+
+    public int compareTo(Exon e) {
+        if(this.exonStart <= e.exonStart) return this.exonStart;
+        else return e.exonStart;
     }
 
 }
