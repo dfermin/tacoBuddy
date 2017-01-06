@@ -24,9 +24,14 @@ public class globalFunctions {
     static String filterREC = null;
     static Set<String> genesDOM = null;
     static Set<String> genesREC = null;
+    static Set<String> featureSet = null;
     static double popFilter = 0.01; // default value
     static String tsOutputModel = null;
     static public SetMultimap<String, Transcript> REC_geneMap = null, DOM_geneMap = null;
+    static Map<String, String> customCalcsMap = null;
+
+
+
 
     static public void parseCommandLineArgs(String[] args) throws IOException {
         File paramF = null;
@@ -84,6 +89,19 @@ public class globalFunctions {
                 for(String s: tmp) genesREC.add(s.replaceAll("\\s*", ""));
             }
 
+            if(line.startsWith("featureList=")) {
+                featureSet = new HashSet<String>();
+                for(String s : line.substring(12).split("[,;\\s]+")) {
+                    featureSet.add(s.toUpperCase()); // store all features as uppercase
+                }
+            }
+
+            if(line.startsWith("customCalc=")) {
+                if(customCalcsMap == null) customCalcsMap = new HashMap<String, String>();
+                String[] tmp = line.substring(11).split("=");
+                customCalcsMap.put(tmp[0], tmp[1]); // key = name of custom field, value = how to calculate it
+            }
+
             if(line.startsWith("filterDOM=")) filterDOM = line.substring(10);
             if(line.startsWith("filterREC=")) filterREC = line.substring(10);
 
@@ -102,6 +120,10 @@ public class globalFunctions {
         if( genesREC.size() > 0 )  System.err.print("REC genes:    " + genesREC + "\n");
         if( filterDOM.length() > 0 ) System.err.print("DOM filters:  " + filterDOM + "\n");
         if( filterREC.length() > 0 ) System.err.print("REC filters:  " + filterREC + "\n");
+        if( customCalcsMap.size() > 0) {
+            System.err.print("Custom calculations:\n");
+            for(String k : customCalcsMap.keySet()) System.err.print("\t" + k + " = " + customCalcsMap.get(k) + "\n");
+        }
         if( tsOutputModel.length() > 0 ) System.err.print("Output:       " + tsOutputModel + "\n");
         System.err.print("-------------------------------------------------------------\n\n");
     }
@@ -146,6 +168,7 @@ public class globalFunctions {
             System.err.println("\nERROR! You must provide a value for EITHER filterDOM or filterREC (or both) in the input file\n");
             System.exit(0);
         }
+
     }
 
 
@@ -161,12 +184,19 @@ public class globalFunctions {
         bw.write("\n# This is the path to the gene coordinate file to use. Must be in GFF3 format.\nsrcGFF3=\n");
         bw.write("\n# List of DOMINANT genes to report results for\ngenesDOM=\n");
         bw.write("\n# List of RECESSIVE genes to report results for\ngenesREC=\n");
+        bw.write("\n# List the variant information (ie: features) in the VCF file you want to report in the final output.\n" +
+                        "# NOTE: This list _MUST_ contain all of the field names you use in 'filterDOM' and filterREC' below.\n" +
+                        "# The entries here can be separated by tabs, spaces, commas or semicolons\n" +
+                        "featureList=\n");
         bw.write("\n# Score filters to apply to the variants in DOMINANT genes\nfilterDOM=\n");
         bw.write("\n# Score filters to apply to the variants in RECESSIVE genes\nfilterREC=\n");
         bw.write("\npopFilter=0.01\n");
         bw.write("\n# The transcript model to report results for.\n#" +
                 "Possible options are LT(longest transcript), MCT(most conserved transcript)\n" +
                 "tsOutputModel=\n");
+        bw.write("\n# If you have custom calculations you want to do you place them here. For each distinct" +
+                "calculation you want to do add a new 'customCalc=' line. An example is provided here.\n" +
+                "#customCalc=MAX_ESP_AA_EA=max(ESP_AA_AC, ESP_AE_AC\n");
         bw.write("\n");
         bw.close();
 

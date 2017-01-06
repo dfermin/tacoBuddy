@@ -4,12 +4,9 @@
 
 package sampsonLab;
 
-import java.io.File;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 
 import apple.laf.JRSUIConstants;
@@ -23,6 +20,7 @@ public class tacoBuddy {
 
 
     static public globalFunctions globals;
+    static public VariantInfoNameMap VCF_Info_Name_Map;
     static VCFParser the_vcf_parser;
     static ArrayList<JRSUIConstants.Variant> DOM_var = null, REC_var = null;
 
@@ -31,6 +29,8 @@ public class tacoBuddy {
 
         // Prepare the globals object to handle user input
         globals = new globalFunctions();
+        VCF_Info_Name_Map = new VariantInfoNameMap();
+
 
         if( args.length < 1 ) {
             System.err.print("\nUSAGE: java -jar tacoBuddy.jar -i <input_file> or -t (to generate template input file)\n\n");
@@ -44,12 +44,13 @@ public class tacoBuddy {
 
 
         // Record any variants that land within the exons of the genes stored in DOM and REC maps
-        if(globals.DOM_geneMap.size() > 0) the_vcf_parser.parse(globals.DOM_geneMap);
-        if(globals.REC_geneMap.size() > 0) the_vcf_parser.parse(globals.REC_geneMap);
+        if(globals.DOM_geneMap.size() > 0) the_vcf_parser.parse(globals.DOM_geneMap, globals.filterDOM);
+        if(globals.REC_geneMap.size() > 0) the_vcf_parser.parse(globals.REC_geneMap, globals.filterREC);
 
         //the_vcf_parser.db_variants();
 
 
+        System.exit(0);
 
 
         // This command only works if you have the tabix tbi file for the input VCF
