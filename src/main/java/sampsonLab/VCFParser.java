@@ -65,82 +65,14 @@ public class VCFParser {
                             }
                         }
 
-                        VI.filter(filter);
+                        // Apply the jexl filter to this variant. If it passes the
+                        boolean VI_status = VI.filter(filter, curTS.getTranscriptID().split("\\.")[0]);
 
                         int j = 1;
                     }
                 }
             }
         }
-
-
-//        int ctr = 1;
-//        for(String geneId: geneMap.keySet()) { // Iterate over the genes in the given geneMap
-//
-//            Set<Transcript> allTS = geneMap.get(geneId);
-//
-//            for(Transcript curTS : allTS) {
-//
-//                for(Exon curE : curTS.getAllExons()) {
-//
-//                    // Get out all variant calls from the VCF file that overlap with any of the
-//                    // exons for this transcript
-//                    CloseableIterator<VariantContext> it = vcfr.query(
-//                            curTS.getTrimmedChrom(),
-//                            curE.exonStart,
-//                            curE.exonEnd);
-//
-//                    while(it.hasNext()) {
-//                        VariantContext vc = it.next();
-//                        String chr = vc.getContig();
-//                        int pos = vc.getEnd();
-//                        double svmProb = Double.parseDouble((String) vc.getAttribute("SVM_PROBABILITY"));
-//                        String ref = vc.getReference().getDisplayString(); // get the reference Allele NT
-//                        String alt = vc.getAltAlleleWithHighestAlleleCount().getDisplayString(); // get the alternative Allele NT
-//                        String dbSNP_id = vc.getID();
-//
-//
-//
-//                        int N = vc.getNSamples();
-//                        for(int i = 0; i < vc.getNSamples(); i++) { // iterate over the samples
-//                            Genotype G = vc.getGenotype(i);
-//
-//
-//                            String variantStr = chr + ":" + pos + ref + ">" + alt;
-//
-//                            prep.setString(1, curTS.getGeneName() );
-//                            prep.setString(2, curTS.getTranscriptID() );
-//                            prep.setString(3, curE.exonID );
-//                            prep.setInt(4, curE.exonNumber );
-//                            prep.setString(5, variantStr );
-//                            prep.setString(6, dbSNP_id );
-//                            prep.setDouble(7, svmProb );
-//                            prep.setString(8, G.getSampleName() );
-//                            prep.setString(9, G.getGenotypeString() );
-//                            prep.setInt(10, G.getDP() );
-//                            prep.setInt( 11, G.getGQ() );
-//
-//                            prep.addBatch();
-//
-//                            if( (ctr%10000) == 0 ) {
-//                                conn.setAutoCommit(false);
-//                                prep.executeBatch();
-//                                conn.setAutoCommit(true);
-//                                prep.clearBatch();
-//                            }
-//                            ctr++;
-//                        }
-//                    }
-//                }
-//            }
-//        }
-//        vcfr.close();
-//        conn.commit();
-//
-//        stmt.execute("SET FILES LOG TRUE");
-//
-//        stmt.close();
-//        conn.close();
     }
 
 

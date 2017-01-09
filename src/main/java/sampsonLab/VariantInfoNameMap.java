@@ -17,11 +17,11 @@ public class VariantInfoNameMap {
     public VariantInfoNameMap() {
         fieldMap = new HashMap<String, String>();
 
-        fieldMap.put("GERP++".toUpperCase(),       "dbNSFP_GERP___RS");
+        fieldMap.put("GERP".toUpperCase(),       "dbNSFP_GERP___RS");
         fieldMap.put("POLYPHEN2_HVAR".toUpperCase(), "dbNSFP_Polyphen2_HVAR_pred");
         fieldMap.put("SIFT".toUpperCase(),           "dbNSFP_SIFT_pred");
         fieldMap.put("MUTATIONTASTER".toUpperCase(), "dbNSFP_MutationTaster_pred");
-        fieldMap.put("is_lof".toUpperCase(),         "EFF");
+        fieldMap.put("EFF".toUpperCase(), "EFF");
     }
 
 

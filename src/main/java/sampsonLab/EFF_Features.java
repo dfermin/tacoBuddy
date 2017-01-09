@@ -7,9 +7,9 @@ import java.util.HashMap;
 /**
  * Created by dfermin on 1/6/17.
  */
-public class EFF_Features {
+public class EFF_Features extends FeatureClass {
 
-    static public HashMap<String, String> eff; // k = transcript ID, v = status_for_this_transcript
+    public HashMap<String, String> eff; // k = transcript ID, v = status_for_this_transcript
 
     public EFF_Features(Object o) {
 
@@ -33,5 +33,16 @@ public class EFF_Features {
         }
     }
 
+
+    // Function returns the value of 'eff' map for the given key 'k'.
+    // If no match is found, null is returned
+    public String findTS(String search_str) {
+        String ret = "no_match";
+
+        if(eff.containsKey(search_str)) {
+            ret = eff.get(search_str);
+        }
+        return ret;
+    }
 
 }

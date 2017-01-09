@@ -6,7 +6,7 @@ import java.util.ArrayList;
 /**
  * Created by dfermin on 1/6/17.
  */
-public class dbNSFP_Features {
+public class dbNSFP_Features extends FeatureClass {
 
     public  String mutationTaster;
     public String polyphen2_hvar;
@@ -23,8 +23,10 @@ public class dbNSFP_Features {
 
     // The SIFT field is for the REF and ALT. We will record the ALT value here
     public void getSIFT(Object o) {
-        ArrayList<String> inputAry = (ArrayList<String>) o;
-        SIFT = inputAry.get(1);
+        if(o != null) {
+            ArrayList<String> inputAry = (ArrayList<String>) o;
+            SIFT = inputAry.get(1);
+        }
     }
 
 

@@ -7,7 +7,7 @@ import java.util.Collections;
 /**
  * Created by dfermin on 1/5/17.
  */
-public class ESP_Features {
+public class ESP_Features extends FeatureClass {
 
     public double ESP_AA_AC, ESP_EA_AC, ESP_MAF;
     public double ESP_MAX_AA_AE;
@@ -25,6 +25,7 @@ public class ESP_Features {
         ArrayList<Double> AF = new ArrayList<Double>();
         double sum = 0;
 
+        if(AC_str.equalsIgnoreCase(".")) return 0.0;
 
         // record all of the allele counts
         for(String s : AC_str.split(",")) {

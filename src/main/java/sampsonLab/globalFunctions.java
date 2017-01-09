@@ -64,6 +64,7 @@ public class globalFunctions {
             if( line.contains("#") ) continue; // we skip lines that contain '#' character
             if( line.length() < 4 ) continue; // not enough data on this line to parse
 
+
             if(line.startsWith("inputVCF=")) {
                 String vcf = line.substring(9);
                 String tbi = vcf + ".tbi";
