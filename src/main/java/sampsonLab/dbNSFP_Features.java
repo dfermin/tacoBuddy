@@ -14,18 +14,24 @@ public class dbNSFP_Features extends FeatureClass {
     public double GERP__RS;
 
     public dbNSFP_Features() {
-        mutationTaster = "";
-        polyphen2_hvar = "";
-        SIFT = "";
-        GERP__RS = 0;
+        mutationTaster = "#NULL";
+        polyphen2_hvar = "#NULL";
+        SIFT = "#NULL";
+        GERP__RS = Double.NaN;
     }
 
 
     // The SIFT field is for the REF and ALT. We will record the ALT value here
     public void getSIFT(Object o) {
+
         if(o != null) {
-            ArrayList<String> inputAry = (ArrayList<String>) o;
-            SIFT = inputAry.get(1);
+            if(o.getClass().getSimpleName().equalsIgnoreCase("String")) {
+                SIFT = (String) o;
+            }
+            else {
+                ArrayList<String> inputAry = (ArrayList<String>) o;
+                SIFT = inputAry.get(1);
+            }
         }
     }
 

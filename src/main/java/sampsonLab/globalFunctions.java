@@ -19,16 +19,16 @@ public class globalFunctions {
 
     static public File inputVCF = null;
     static public File inputVCF_tabix = null;
-    static File srcGFF3 = null;
-    static String filterDOM = null;
-    static String filterREC = null;
-    static Set<String> genesDOM = null;
-    static Set<String> genesREC = null;
-    static Set<String> featureSet = null;
-    static double popFilter = 0.01; // default value
-    static String tsOutputModel = null;
+    static public File srcGFF3 = null;
+    static public String filterDOM = null;
+    static public String filterREC = null;
+    static public Set<String> genesDOM = null;
+    static public Set<String> genesREC = null;
+    static public Set<String> featureSet = null;
+    static public double popFilter = 0.01; // default value
+    static public String tsOutputModel = null;
     static public SetMultimap<String, Transcript> REC_geneMap = null, DOM_geneMap = null;
-    static Map<String, String> customCalcsMap = null;
+    static public Map<String, String> customCalcsMap = null;
 
 
 
@@ -64,6 +64,7 @@ public class globalFunctions {
             if( line.contains("#") ) continue; // we skip lines that contain '#' character
             if( line.length() < 4 ) continue; // not enough data on this line to parse
 
+            if( line.contains("GERP++") ) line = line.replaceAll("\\+\\+", "");
 
             if(line.startsWith("inputVCF=")) {
                 String vcf = line.substring(9);
@@ -119,9 +120,9 @@ public class globalFunctions {
         if( !(null == srcGFF3) )     System.err.print("source GFF:   " + srcGFF3.getCanonicalPath() + "\n");
         if( genesDOM.size() > 0 )  System.err.print("DOM genes:    " + genesDOM + "\n");
         if( genesREC.size() > 0 )  System.err.print("REC genes:    " + genesREC + "\n");
-        if( filterDOM.length() > 0 ) System.err.print("DOM filters:  " + filterDOM + "\n");
-        if( filterREC.length() > 0 ) System.err.print("REC filters:  " + filterREC + "\n");
-        if( customCalcsMap.size() > 0) {
+        if( filterDOM != null ) System.err.print("DOM filters:  " + filterDOM + "\n");
+        if( filterREC != null ) System.err.print("REC filters:  " + filterREC + "\n");
+        if( customCalcsMap != null ) {
             System.err.print("Custom calculations:\n");
             for(String k : customCalcsMap.keySet()) System.err.print("\t" + k + " = " + customCalcsMap.get(k) + "\n");
         }
@@ -169,7 +170,6 @@ public class globalFunctions {
             System.err.println("\nERROR! You must provide a value for EITHER filterDOM or filterREC (or both) in the input file\n");
             System.exit(0);
         }
-
     }
 
 
@@ -188,7 +188,7 @@ public class globalFunctions {
         bw.write("\n# List the variant information (ie: features) in the VCF file you want to report in the final output.\n" +
                         "# NOTE: This list _MUST_ contain all of the field names you use in 'filterDOM' and filterREC' below.\n" +
                         "# The entries here can be separated by tabs, spaces, commas or semicolons\n" +
-                        "featureList=\n");
+                        "featureList=GENEINFO\n");
         bw.write("\n# Score filters to apply to the variants in DOMINANT genes\nfilterDOM=\n");
         bw.write("\n# Score filters to apply to the variants in RECESSIVE genes\nfilterREC=\n");
         bw.write("\npopFilter=0.01\n");

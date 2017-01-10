@@ -56,7 +56,10 @@ public class VCFParser {
                         String ref = vc.getReference().getDisplayString(); // get the reference Allele NT
                         String alt = vc.getAltAlleleWithHighestAlleleCount().getDisplayString(); // get the alternative Allele NT
 
+                        //if( pos != 179520569 ) continue; // debug
+
                         VariantInfo VI = new VariantInfo(chr, pos, ref, alt);
+                        VI.setSvmProb(svmProb);
 
                         for(String s : globalFunctions.featureSet) {
                             if( !VI.fetchFeature(s, vc) ) {
@@ -68,6 +71,9 @@ public class VCFParser {
                         // Apply the jexl filter to this variant. If it passes the
                         boolean VI_status = VI.filter(filter, curTS.getTranscriptID().split("\\.")[0]);
 
+                        System.err.print(chr + ":" + pos + ref + ">" + alt + "\n");
+                        System.out.print(VI.returnSummaryString(geneId, true));
+
                         int j = 1;
                     }
                 }
@@ -76,18 +82,18 @@ public class VCFParser {
     }
 
 
-    public void db_variants() {
-        Iterator<VariantContext> it = vcList.iterator();
-        while(it.hasNext()) {
-            VariantContext vc = (VariantContext) it.next();
-            Genotype G = vc.getGenotype((172-10));
-
-            System.out.print(
-                    "chr" + vc.getContig() + ":" + vc.getEnd() + vc.getReference().getDisplayString() + ">" + vc.getAltAlleleWithHighestAlleleCount().getDisplayString() + "\t" +
-                    G.getSampleName() + "\t" + G.getGenotypeString() + "\n");
-
-
-            break;
-        }
-    }
+//    public void db_variants() {
+//        Iterator<VariantContext> it = vcList.iterator();
+//        while(it.hasNext()) {
+//            VariantContext vc = (VariantContext) it.next();
+//            Genotype G = vc.getGenotype((172-10));
+//
+//            System.out.print(
+//                    "chr" + vc.getContig() + ":" + vc.getEnd() + vc.getReference().getDisplayString() + ">" + vc.getAltAlleleWithHighestAlleleCount().getDisplayString() + "\t" +
+//                    G.getSampleName() + "\t" + G.getGenotypeString() + "\n");
+//
+//
+//            break;
+//        }
+//    }
 }
