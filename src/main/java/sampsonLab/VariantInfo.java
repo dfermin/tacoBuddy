@@ -17,6 +17,7 @@ public class VariantInfo {
     public String REF;
     public String ALT;
     public String snp_id;
+    public int passedFilter; // 0 = false, 1 = true
 
     public double svmProb;
 
@@ -33,6 +34,7 @@ public class VariantInfo {
         this.REF = ref;
         this.ALT = alt;
         this.svmProb = 0.0;
+        this.passedFilter = 0;
 
         // construct snp_id string
         snp_id = chr + ":" + String.valueOf(pos) + ":" + REF + ">" + ALT;
@@ -66,34 +68,34 @@ public class VariantInfo {
         // If you get a match, record the relevant data for that feature
         if( tacoBuddy.VCF_Info_Name_Map.inMap(feat.toUpperCase()) ) {
             String k = tacoBuddy.VCF_Info_Name_Map.getValue(feat.toUpperCase());
-            Object v = vc.getAttribute(k);
+            //Object v = vc.getAttribute(k);
 
-            if(v != null) {
+            String v_str = vc.getAttributeAsString(k, "#NULL");
+            v_str = v_str.replaceAll("\\[", "").replaceAll("\\]", "");
+
+            if( !v_str.equalsIgnoreCase("#NULL") ) {
 
                 if (feat.equalsIgnoreCase("EFF")) {
-                    EFF = new EFF_Features(v);
+                    EFF = new EFF_Features(v_str);
                 }
                 if (feat.equalsIgnoreCase("MutationTaster")) {
                     if (dbNSFP == null) dbNSFP = new dbNSFP_Features();
-                    dbNSFP.mutationTaster = (String) v;
+                    dbNSFP.mutationTaster = v_str;
                 }
 
                 if (feat.equalsIgnoreCase("GERP")) {
                     if (dbNSFP == null) dbNSFP = new dbNSFP_Features();
-                    dbNSFP.GERP__RS = Double.valueOf((String) v);
+                    dbNSFP.GERP__RS = Double.valueOf(v_str);
                 }
 
                 if (feat.equalsIgnoreCase("Polyphen2_Hvar")) {
                     if (dbNSFP == null) dbNSFP = new dbNSFP_Features();
-                    if(v.getClass().getSimpleName().equalsIgnoreCase("String"))
-                        dbNSFP.polyphen2_hvar = (String) v;
-                    else
-                        dbNSFP.polyphen2_hvar = ((ArrayList<String>) v).get(0);
+                    dbNSFP.polyphen2_hvar = v_str;
                 }
 
                 if (feat.equalsIgnoreCase("sift")) {
                     if (dbNSFP == null) dbNSFP = new dbNSFP_Features();
-                    dbNSFP.getSIFT(v);
+                    dbNSFP.SIFT = v_str;
                 }
             }
         }
@@ -104,7 +106,7 @@ public class VariantInfo {
 
     // Function applies the user's filter to this variant. Calling this function assumes VariantInfo::fetchFeature()
     // ran successfully. The curTS_ID is only needed if the user requested to evaluate the 'EFF' info field.
-    public boolean filter(String jexl_filter_str, String curTS_ID) {
+    public void filter(String jexl_filter_str, String curTS_ID) {
 
         // The ++ string breaks jexl so we strip it out. It should only occur in the GERP++ name anyways
         if(jexl_filter_str.contains("++")) {
@@ -120,6 +122,10 @@ public class VariantInfo {
             tmp = null;
         }
 
+        jexl_filter_str = jexl_filter_str.replaceAll(" and ", " && ");
+        jexl_filter_str = jexl_filter_str.replaceAll(" or ", " || ");
+
+
         JexlEngine jexl = new JexlBuilder().create(); // Create a jexl engine
         JexlExpression expr = jexl.createExpression(jexl_filter_str); // define the expression you want to test/use
 
@@ -133,7 +139,7 @@ public class VariantInfo {
         boolean retVal = false;
         retVal = (Boolean) expr.evaluate(jc);
 
-        return retVal;
+        if(retVal) passedFilter = 1;
     }
 
 
@@ -160,7 +166,6 @@ public class VariantInfo {
             jc.set("EFF", EFF.findTS(curTS_ID));
         }
     }
-
 
     // Function returns the requested features for this variant.
     public String returnSummaryString(String geneId, boolean printThisVariant) {
@@ -215,31 +220,24 @@ public class VariantInfo {
         }
 
         // Now construct the return string based upon the data in returnValueMap.
+        ArrayList<String> dataList = new ArrayList<String>();
+        for(String feat : globalFunctions.featureSet) {
+            if(feat.equalsIgnoreCase("EFF")) continue;
+            String tmp = feat + "=" + returnValueMap.get(feat);
+            dataList.add(tmp);
+        }
+        String data_line = Joiner.on("\t").join(dataList) + "\n";
+
+
         if(transcriptMap != null) {
             // Special case, need to report each transcript row by row
-            String base = snp_id + "\t" + geneId + "\t";
-            ArrayList<String> dataList = new ArrayList<String>();
-            for(String feat : globalFunctions.featureSet) {
-                if(feat.equalsIgnoreCase("EFF")) continue;
-                String tmp = feat + "=" + returnValueMap.get(feat);
-                dataList.add(tmp);
-            }
-
-            String data_line = Joiner.on("\t").join(dataList) + "\n";
-
+            String base = Integer.toString(this.passedFilter) + "\t" + snp_id + "\t" + geneId + "\t";
             for(String curTS : transcriptMap.keySet()) {
                 ret += base + curTS + "\tEFF=" + transcriptMap.get(curTS) + "\t" + data_line;
             }
         }
         else {
-            ArrayList<String> dataList = new ArrayList<String>();
-            for(String feat : globalFunctions.featureSet) {
-                if(feat.equalsIgnoreCase("EFF")) continue;
-                String tmp = feat + "=" + returnValueMap.get(feat);
-                dataList.add(tmp);
-            }
-
-            ret = snp_id + "\t" + geneId + "\t" + Joiner.on("\t").join(dataList) + "\n";
+            ret = Integer.toString(this.passedFilter) + "\t" + snp_id + "\t" + geneId + "\t" + data_line;
         }
 
         return ret;
@@ -247,6 +245,7 @@ public class VariantInfo {
 
 
 
+    // Manually round the given double to a specific number of digits and return a String with it's value
     private static String dbl2str(double d, int precision) {
         String t = "%." + Integer.toString(precision) + "f";
         return String.format(t, d);

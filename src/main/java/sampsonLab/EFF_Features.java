@@ -11,17 +11,17 @@ public class EFF_Features extends FeatureClass {
 
     public HashMap<String, String> eff; // k = transcript ID, v = status_for_this_transcript
 
-    public EFF_Features(Object o) {
+    public EFF_Features(String ss) {
 
         eff = new HashMap<String, String>();
 
-        ArrayList<String> inputAry = (ArrayList<String>) o;
+        String[] inputAry = ss.split(",");
 
         for(String s : inputAry) {
 
             String[] tmpAry = s.split("\\|");
 
-            String label = tmpAry[0].substring(0,tmpAry[0].indexOf('(')); // gets the "assigned effect" of this variant on the given gene.
+            String label = tmpAry[0].substring(0,tmpAry[0].indexOf('(')).trim(); // gets the "assigned effect" of this variant on the given gene.
             String transId = "";
             for(int j = 1; j < tmpAry.length; j++) {
                 if( tmpAry[j].startsWith("ENST00") ) {
@@ -29,9 +29,10 @@ public class EFF_Features extends FeatureClass {
                     break;
                 }
             }
-            eff.put(transId, label);
+            if(transId.startsWith("ENST00")) eff.put(transId, label);
         }
     }
+
 
 
     // Function returns the value of 'eff' map for the given key 'k'.

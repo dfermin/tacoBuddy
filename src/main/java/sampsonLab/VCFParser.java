@@ -1,11 +1,13 @@
 package sampsonLab;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.SetMultimap;
 import htsjdk.samtools.util.CloseableIterator;
 import htsjdk.variant.variantcontext.Genotype;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.vcf.VCFFileReader;
 
+import javax.sql.rowset.Joinable;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -34,6 +36,12 @@ public class VCFParser {
         VCFFileReader vcfr = new VCFFileReader(inputVCF, inputVCF_tabix);
 
 
+        // Print header line
+        String hdr = "passedFilter\tCoord\tgeneid\t";
+        if(globalFunctions.featureSet.contains("EFF")) hdr += "transcript\t";
+        hdr += Joiner.on("\t").join(globalFunctions.featureSet);
+        System.out.println(hdr);
+
         int ctr = 1;
         for(String geneId: geneMap.keySet()) { // Iterate over the genes in the given geneMap
 
@@ -56,7 +64,6 @@ public class VCFParser {
                         String ref = vc.getReference().getDisplayString(); // get the reference Allele NT
                         String alt = vc.getAltAlleleWithHighestAlleleCount().getDisplayString(); // get the alternative Allele NT
 
-                        //if( pos != 179520569 ) continue; // debug
 
                         VariantInfo VI = new VariantInfo(chr, pos, ref, alt);
                         VI.setSvmProb(svmProb);
@@ -69,9 +76,9 @@ public class VCFParser {
                         }
 
                         // Apply the jexl filter to this variant. If it passes the
-                        boolean VI_status = VI.filter(filter, curTS.getTranscriptID().split("\\.")[0]);
+                        VI.filter(filter, curTS.getTranscriptID().split("\\.")[0]);
 
-                        System.err.print(chr + ":" + pos + ref + ">" + alt + "\n");
+                        System.err.print(chr + ":" + pos + ref + ">" + alt + "\n"); // progress indicator
                         System.out.print(VI.returnSummaryString(geneId, true));
 
                         int j = 1;

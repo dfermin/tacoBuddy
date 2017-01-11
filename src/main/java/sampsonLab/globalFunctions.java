@@ -1,8 +1,6 @@
 package sampsonLab;
 
 import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Multiset;
 import com.google.common.collect.SetMultimap;
 
 import java.io.*;
@@ -24,7 +22,7 @@ public class globalFunctions {
     static public String filterREC = null;
     static public Set<String> genesDOM = null;
     static public Set<String> genesREC = null;
-    static public Set<String> featureSet = null;
+    static public SortedSet<String> featureSet = null;
     static public double popFilter = 0.01; // default value
     static public String tsOutputModel = null;
     static public SetMultimap<String, Transcript> REC_geneMap = null, DOM_geneMap = null;
@@ -92,7 +90,7 @@ public class globalFunctions {
             }
 
             if(line.startsWith("featureList=")) {
-                featureSet = new HashSet<String>();
+                featureSet = new TreeSet<String>();
                 for(String s : line.substring(12).split("[,;\\s]+")) {
                     featureSet.add(s.toUpperCase()); // store all features as uppercase
                 }
