@@ -1,8 +1,8 @@
 package sampsonLab;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
+import com.google.common.base.Joiner;
+
+import java.util.*;
 
 /**
  * Created by dfermin on 1/6/17.
@@ -43,6 +43,25 @@ public class EFF_Features extends FeatureClass {
         if(eff.containsKey(search_str)) {
             ret = eff.get(search_str);
         }
+        return ret;
+    }
+
+
+    // Function iterates over the values in 'eff' and concatenates the unique ones into an array
+    // that jexl can interpret. This function is for gene-level output.
+    public String returnJexlArray() {
+        String ret = "";
+        SortedSet<String> SS = new TreeSet<String>();
+
+        for(String v : eff.values()) {
+
+            for(String i : v.split(",")) {
+                i = "'" + i.trim() + "'";
+                SS.add(i);
+            }
+        }
+
+        ret = "[" + Joiner.on(",").join(SS) + "]";
         return ret;
     }
 

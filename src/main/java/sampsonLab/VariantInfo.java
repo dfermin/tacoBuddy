@@ -68,7 +68,6 @@ public class VariantInfo {
         // If you get a match, record the relevant data for that feature
         if( tacoBuddy.VCF_Info_Name_Map.inMap(feat.toUpperCase()) ) {
             String k = tacoBuddy.VCF_Info_Name_Map.getValue(feat.toUpperCase());
-            //Object v = vc.getAttribute(k);
 
             String v_str = vc.getAttributeAsString(k, "#NULL");
             v_str = v_str.replaceAll("\\[", "").replaceAll("\\]", "");
@@ -80,7 +79,7 @@ public class VariantInfo {
                 }
                 if (feat.equalsIgnoreCase("MutationTaster")) {
                     if (dbNSFP == null) dbNSFP = new dbNSFP_Features();
-                    dbNSFP.mutationTaster = v_str;
+                    dbNSFP.mutationTaster = formatStringForJexl(v_str);
                 }
 
                 if (feat.equalsIgnoreCase("GERP")) {
@@ -90,12 +89,12 @@ public class VariantInfo {
 
                 if (feat.equalsIgnoreCase("Polyphen2_Hvar")) {
                     if (dbNSFP == null) dbNSFP = new dbNSFP_Features();
-                    dbNSFP.polyphen2_hvar = v_str;
+                    dbNSFP.polyphen2_hvar = formatStringForJexl(v_str);
                 }
 
                 if (feat.equalsIgnoreCase("sift")) {
                     if (dbNSFP == null) dbNSFP = new dbNSFP_Features();
-                    dbNSFP.SIFT = v_str;
+                    dbNSFP.SIFT = formatStringForJexl(v_str);
                 }
             }
         }
@@ -106,7 +105,8 @@ public class VariantInfo {
 
     // Function applies the user's filter to this variant. Calling this function assumes VariantInfo::fetchFeature()
     // ran successfully. The curTS_ID is only needed if the user requested to evaluate the 'EFF' info field.
-    public void filter(String jexl_filter_str, String curTS_ID) {
+    public void filter(String jexl_filter_str) {
+
 
         // The ++ string breaks jexl so we strip it out. It should only occur in the GERP++ name anyways
         if(jexl_filter_str.contains("++")) {
@@ -122,19 +122,15 @@ public class VariantInfo {
             tmp = null;
         }
 
-        jexl_filter_str = jexl_filter_str.replaceAll(" and ", " && ");
-        jexl_filter_str = jexl_filter_str.replaceAll(" or ", " || ");
-
-
-        JexlEngine jexl = new JexlBuilder().create(); // Create a jexl engine
+        JexlEngine jexl = new JexlBuilder().cache(512).strict(true).silent(false).create(); // Create a jexl engine
         JexlExpression expr = jexl.createExpression(jexl_filter_str); // define the expression you want to test/use
 
         // Create a MapContext object and populate it with the variables that are in VariantInfo objects
         JexlContext jc = new MapContext();
 
-        if(dbNSFP != null) prepContextMap(dbNSFP, jc, curTS_ID);
-        if(ESP != null) prepContextMap(ESP, jc, curTS_ID);
-        if(EFF != null) prepContextMap(EFF, jc, curTS_ID);
+        if(dbNSFP != null) prepContextMap(dbNSFP, jc);
+        if(ESP != null) prepContextMap(ESP, jc);
+        if(EFF != null) prepContextMap(EFF, jc);
 
         boolean retVal = false;
         retVal = (Boolean) expr.evaluate(jc);
@@ -145,7 +141,7 @@ public class VariantInfo {
 
 
     // Function to populate the jexlContext map with the variables the user has elected to filter on
-    private void prepContextMap(Object o, JexlContext jc, String curTS_ID) {
+    private void prepContextMap(Object o, JexlContext jc) {
 
         String dataType = o.getClass().getSimpleName();
 
@@ -162,10 +158,24 @@ public class VariantInfo {
         }
 
         if(dataType.equalsIgnoreCase("EFF_Features")) {
-            String jj = EFF.findTS(curTS_ID);
-            jc.set("EFF", EFF.findTS(curTS_ID));
+            jc.set("EFF", EFF.returnJexlArray());
         }
     }
+
+
+    // Function formats the given string so that Jexl will view it as an array.
+    // This function assumes the data passed to it is comma separated
+    private String formatStringForJexl(String inputStr) {
+        String ret = "";
+        ArrayList<String> A = new ArrayList<String>();
+        for(String s : inputStr.split(",")) {
+            String tmp = "'" + s.trim() + "'";
+            A.add(tmp);
+        }
+        ret = "[" + Joiner.on(",").join(A) + "]";
+        return ret;
+    }
+
 
     // Function returns the requested features for this variant.
     public String returnSummaryString(String geneId, boolean printThisVariant) {
@@ -173,7 +183,6 @@ public class VariantInfo {
 
         if(printThisVariant == false) return "";
 
-        HashMap<String, String> transcriptMap = null;
         HashMap<String, String> returnValueMap = new HashMap<String, String>();
 
         for(String feat : globalFunctions.featureSet) {
@@ -182,7 +191,8 @@ public class VariantInfo {
 
             // Special case where you have to iterate over the transcripts.
             if (feat.equalsIgnoreCase("EFF")) {
-                transcriptMap = EFF.eff;
+                returnValueMap.put(feat, EFF.returnJexlArray());
+                continue;
             }
             if (feat.equalsIgnoreCase("MUTATIONTASTER")) {
                 returnValueMap.put(feat, dbNSFP.mutationTaster);
@@ -222,23 +232,12 @@ public class VariantInfo {
         // Now construct the return string based upon the data in returnValueMap.
         ArrayList<String> dataList = new ArrayList<String>();
         for(String feat : globalFunctions.featureSet) {
-            if(feat.equalsIgnoreCase("EFF")) continue;
             String tmp = feat + "=" + returnValueMap.get(feat);
             dataList.add(tmp);
         }
         String data_line = Joiner.on("\t").join(dataList) + "\n";
 
-
-        if(transcriptMap != null) {
-            // Special case, need to report each transcript row by row
-            String base = Integer.toString(this.passedFilter) + "\t" + snp_id + "\t" + geneId + "\t";
-            for(String curTS : transcriptMap.keySet()) {
-                ret += base + curTS + "\tEFF=" + transcriptMap.get(curTS) + "\t" + data_line;
-            }
-        }
-        else {
-            ret = Integer.toString(this.passedFilter) + "\t" + snp_id + "\t" + geneId + "\t" + data_line;
-        }
+        ret = Integer.toString(this.passedFilter) + "\t" + snp_id + "\t" + geneId + "\t" + data_line;
 
         return ret;
     }
@@ -248,6 +247,12 @@ public class VariantInfo {
     // Manually round the given double to a specific number of digits and return a String with it's value
     private static String dbl2str(double d, int precision) {
         String t = "%." + Integer.toString(precision) + "f";
-        return String.format(t, d);
+
+        // If after truncation 't' is zero, report 0 instead
+        String ret = String.format(t,d);
+        double tmp = Double.valueOf(ret);
+        if(tmp == 0) ret = "0";
+
+        return ret;
     }
 }

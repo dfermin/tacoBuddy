@@ -35,13 +35,6 @@ public class VCFParser {
         // This command only works if you have the tabix tbi file for the input VCF
         VCFFileReader vcfr = new VCFFileReader(inputVCF, inputVCF_tabix);
 
-
-        // Print header line
-        String hdr = "passedFilter\tCoord\tgeneid\t";
-        if(globalFunctions.featureSet.contains("EFF")) hdr += "transcript\t";
-        hdr += Joiner.on("\t").join(globalFunctions.featureSet);
-        System.out.println(hdr);
-
         int ctr = 1;
         for(String geneId: geneMap.keySet()) { // Iterate over the genes in the given geneMap
 
@@ -76,7 +69,8 @@ public class VCFParser {
                         }
 
                         // Apply the jexl filter to this variant. If it passes the
-                        VI.filter(filter, curTS.getTranscriptID().split("\\.")[0]);
+//                        VI.filter(filter, curTS.getTranscriptID().split("\\.")[0]);
+                        VI.filter(filter);
 
                         System.err.print(chr + ":" + pos + ref + ">" + alt + "\n"); // progress indicator
                         System.out.print(VI.returnSummaryString(geneId, true));

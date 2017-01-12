@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Map;
 
 import apple.laf.JRSUIConstants;
+import com.google.common.base.Joiner;
 import htsjdk.samtools.util.CloseableIterator;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.vcf.*;
@@ -42,6 +43,11 @@ public class tacoBuddy {
 
         the_vcf_parser = new VCFParser(globals.inputVCF, globals.inputVCF_tabix);
 
+
+        // Print header line
+        String hdr = "passedFilter\tCoord (hg19)\tgeneid\t";
+        hdr += Joiner.on("\t").join(globalFunctions.featureSet);
+        System.out.println(hdr);
 
         // Record any variants that land within the exons of the genes stored in DOM and REC maps
         if(globals.DOM_geneMap.size() > 0) the_vcf_parser.parse(globals.DOM_geneMap, globals.filterDOM);
