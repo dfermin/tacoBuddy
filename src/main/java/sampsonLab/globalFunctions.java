@@ -106,8 +106,8 @@ public class globalFunctions {
                 customCalcsMap.put(tmp[0], tmp[1]); // key = name of custom field, value = how to calculate it
             }
 
-            if(line.startsWith("filterDOM=")) filterDOM = line.substring(10);
-            if(line.startsWith("filterREC=")) filterREC = line.substring(10);
+            if(line.startsWith("filterDOM=")) filterDOM = reformat_filter(line.substring(10));
+            if(line.startsWith("filterREC=")) filterREC = reformat_filter(line.substring(10));
 
             if(line.startsWith("popFilter=")) popFilter = Double.parseDouble(line.substring(10));
             if(line.startsWith("tsOutputModel=")) tsOutputModel = line.substring(14);
@@ -175,6 +175,54 @@ public class globalFunctions {
     }
 
 
+    // Function reformats the user filter to make sure it will work with jexl
+    private static String reformat_filter(String origFilter) {
+        String ret = "";
+        if(!origFilter.contains("/")) ret = origFilter;
+        else {
+            ArrayList<String> AL = new ArrayList<String>();
+            ArrayList<Integer> slashPos = new ArrayList<Integer>();
+            for(int i = 0; i < origFilter.length(); i++) {
+                if(origFilter.charAt(i) == '/') slashPos.add(i);
+            }
+
+            // slashPos must have an even number of entries since the '/' always comes as a pair
+            for(int i = 0; i < slashPos.size() - 1; i += 2) {
+                int j = i + 1;
+                String tmp = origFilter.substring(slashPos.get(i)+1, slashPos.get(j));
+                AL.add(tmp);
+            }
+
+            // AL now contains every instance of a perl-like or regex (example: ['ABCD'] =~ blah)
+            // Reformat each one to be in compliance with the jexl api
+            HashMap<String, String> jexlMap = new HashMap<String, String>();
+            String tmp = "";
+            for(String s : AL) {
+                String key = s;
+                s = s.trim().replaceAll("\\[", "").replaceAll("\\]", "").replaceAll("'", ""); // strip out []'
+                int i = s.indexOf("=~");
+                String comparison_suffix = s.substring(i).trim();
+                String pattern = s.substring(0,i).trim();
+                ArrayList<String> Jarray = new ArrayList<String>();
+                for(String k : pattern.split("")) {
+                    tmp = "('" + k + "' " + comparison_suffix + ")";
+                    Jarray.add(tmp);
+                }
+                tmp = "(" + Joiner.on(" or ").join(Jarray) + ")";
+                jexlMap.put(key, tmp); // k = original string, v = jexl compliant string
+            }
+
+            // Now replace the regex values in origFilter with the new values we've created in jexlMap
+            ret = origFilter.replaceAll("/", "");
+            for(String k : jexlMap.keySet()) {
+                ret = ret.replace(k, jexlMap.get(k));
+            }
+        }
+        return ret;
+    }
+
+
+
 
     private static void writeTemplateInputFile() throws IOException {
         File templateF = new File("./tacoBuddy-inputTemplate.txt");
@@ -191,6 +239,7 @@ public class globalFunctions {
                         "# NOTE: This list _MUST_ contain all of the field names you use in 'filterDOM' and filterREC' below.\n" +
                         "# The entries here can be separated by tabs, spaces, commas or semicolons\n" +
                         "featureList=GENEINFO\n");
+        bw.write("\n# Enter regex-like filters there for genes. For 'or' conditions, surround the whole regex in forward slashes. Example: /['DT'] =~ SIFT/\n");
         bw.write("\n# Score filters to apply to the variants in DOMINANT genes\nfilterDOM=\n");
         bw.write("\n# Score filters to apply to the variants in RECESSIVE genes\nfilterREC=\n");
         bw.write("\npopFilter=0.01\n");
