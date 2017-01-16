@@ -64,5 +64,4 @@ public class EFF_Features extends FeatureClass {
         ret = "[" + Joiner.on(",").join(SS) + "]";
         return ret;
     }
-
 }

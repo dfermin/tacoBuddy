@@ -1,16 +1,12 @@
 package sampsonLab;
 
-import com.google.common.base.Joiner;
 import com.google.common.collect.SetMultimap;
 import htsjdk.samtools.util.CloseableIterator;
-import htsjdk.variant.variantcontext.Genotype;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.vcf.VCFFileReader;
 
-import javax.sql.rowset.Joinable;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Iterator;
 
 
 /**
@@ -28,7 +24,7 @@ public class VCFParser {
 
 
     // Parse the VCF file, keeping only the variant calls that overlap with our genes of interest and meet our filtering
-    public void parse(SetMultimap<String, Transcript> geneMap, String filter) {
+    public void parse(SetMultimap<String, Transcript> geneMap, String filter, String filterType) {
 
         vcList = new ArrayList<VariantContext>();
 
@@ -37,6 +33,8 @@ public class VCFParser {
 
         int ctr = 1;
         for(String geneId: geneMap.keySet()) { // Iterate over the genes in the given geneMap
+
+
 
             for(Transcript curTS : geneMap.get(geneId)) { // Iterate over the transcripts for this gene
 
@@ -69,32 +67,19 @@ public class VCFParser {
                         }
 
                         // Apply the jexl filter to this variant. If it passes the
-//                        VI.filter(filter, curTS.getTranscriptID().split("\\.")[0]);
-                        VI.filter(filter);
+                        if( VI.filter(filter) ) { // keep this variant because it met all of our filtering criteria.
+                            VI.add(vc);
+
+                            if(VI.hasCandidateSubjects(filterType)) {
+                                ArrayList<String> patientGenotype = VI.getPatientData();
+                                System.out.print(VI.returnSummaryString(geneId, patientGenotype, filterType));
+                            }
+                        }
 
                         System.err.print(chr + ":" + pos + ref + ">" + alt + "\n"); // progress indicator
-                        System.out.print(VI.returnSummaryString(geneId, true));
-
-                        int j = 1;
                     }
                 }
             }
         }
     }
-
-
-//    public void db_variants() {
-//        Iterator<VariantContext> it = vcList.iterator();
-//        while(it.hasNext()) {
-//            VariantContext vc = (VariantContext) it.next();
-//            Genotype G = vc.getGenotype((172-10));
-//
-//            System.out.print(
-//                    "chr" + vc.getContig() + ":" + vc.getEnd() + vc.getReference().getDisplayString() + ">" + vc.getAltAlleleWithHighestAlleleCount().getDisplayString() + "\t" +
-//                    G.getSampleName() + "\t" + G.getGenotypeString() + "\n");
-//
-//
-//            break;
-//        }
-//    }
 }

@@ -239,7 +239,7 @@ public class globalFunctions {
                         "# NOTE: This list _MUST_ contain all of the field names you use in 'filterDOM' and filterREC' below.\n" +
                         "# The entries here can be separated by tabs, spaces, commas or semicolons\n" +
                         "featureList=GENEINFO\n");
-        bw.write("\n# Enter regex-like filters there for genes. For 'or' conditions, surround the whole regex in forward slashes. Example: /['DT'] =~ SIFT/\n");
+        bw.write("\n# Enter regex-like filters there for genes. For 'or' conditions surround the whole regex in forward slashes. Example: /['DT'] =~ SIFT/\n");
         bw.write("\n# Score filters to apply to the variants in DOMINANT genes\nfilterDOM=\n");
         bw.write("\n# Score filters to apply to the variants in RECESSIVE genes\nfilterREC=\n");
         bw.write("\npopFilter=0.01\n");
