@@ -246,9 +246,9 @@ public class globalFunctions {
         bw.write("\n# The transcript model to report results for.\n#" +
                 "Possible options are LT(longest transcript), MCT(most conserved transcript)\n" +
                 "tsOutputModel=\n");
-        bw.write("\n# If you have custom calculations you want to do you place them here. For each distinct" +
-                "calculation you want to do add a new 'customCalc=' line. An example is provided here.\n" +
-                "#customCalc=MAX_ESP_AA_EA=max(ESP_AA_AC, ESP_AE_AC\n");
+//        bw.write("\n# If you have custom calculations you want to do you place them here. For each distinct" +
+//                "calculation you want to do add a new 'customCalc=' line. An example is provided here.\n" +
+//                "#customCalc=MAX_ESP_AA_EA=max(ESP_AA_AC, ESP_AE_AC\n");
         bw.write("\n");
         bw.close();
 

@@ -47,6 +47,7 @@ public class tacoBuddy {
         // Print header line
         String hdr = "#SAMPLE\tGenotype\tFilter\tGene_Name\tCoord (hg19)\t";
         hdr += Joiner.on("\t").join(globalFunctions.featureSet);
+        hdr += "\tSample_AF_percent";
         hdr = hdr.replaceAll("EFF\t", "");
         System.out.println(hdr);
 

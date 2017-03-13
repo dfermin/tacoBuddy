@@ -20,10 +20,16 @@ public class ESP_Features extends FeatureClass {
     }
 
 
+    // Function computes the Alternative allele frequency from ESP counts.
+    // This value is usually the minor allele frequency (MAF) but to be technically correct it should be
+    // called the alternative allele frequency.
     public double calcMAF(String AC_str) {
         ArrayList<Double> counts = new ArrayList<Double>();
         ArrayList<Double> AF = new ArrayList<Double>();
         double sum = 0;
+
+        // For 'ESP6500SI-V2-SSA137.GRCh38-liftover' vcf file which we are using,
+        // the syntax for ESP Allele Count is in the order of AltAlleles,RefAllele.
 
         if(AC_str.equalsIgnoreCase(".")) return 0.0;
 
@@ -45,23 +51,8 @@ public class ESP_Features extends FeatureClass {
         if(AF.size() > 1) MAF_ret = Math.exp(AF.get(1)); // convert back to linear-scale!!!
         else MAF_ret = Math.exp(AF.get(0));  // convert back to linear-scale!!!
 
-        return MAF_ret;
+        return ( MAF_ret * 100 ); // we return a percentage so multiply it by 100
     }
 
-    // Parses the ESP_MAF field from the given string
-    public void setESP_MAF(String AC_str) {
-        if( !AC_str.equalsIgnoreCase(".") ) {
-            ArrayList<Double> AF = new ArrayList<Double>();
-            for(String s : AC_str.split(",")) {
-                double d = Double.valueOf(s);
-                AF.add(d);
-            }
-            Collections.sort(AF);
-            Collections.reverse(AF);
-            double tmp = 0;
-            if(AF.size() > 1) this.ESP_MAF = AF.get(1);
-            else this.ESP_MAF = AF.get(0);
-        }
-    }
 
 }

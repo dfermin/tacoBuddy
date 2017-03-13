@@ -21,8 +21,9 @@ public class VariantInfo {
     public int passedFilter; // 0 = false, 1 = true
 
     public double svmProb;
+    public double sample_MAF; // minor allele frequency for the samples
 
-    public HashMap<String, Genotype_Feature> genotypeMap;
+    public HashMap<String, Genotype_Feature> genotypeMap; // k = sampleID, v = genotype_feature object for this subject
     public TreeSet<String> candPatients;
 
     // These object only get initialized if the user decides to use them
@@ -39,6 +40,7 @@ public class VariantInfo {
         this.ALT = alt;
         this.svmProb = 0.0;
         this.passedFilter = 0;
+        this.sample_MAF = -1.0;
 
         // construct snp_id string
         snp_id = chr + ":" + String.valueOf(pos) + ":" + REF + ">" + ALT;
@@ -64,11 +66,11 @@ public class VariantInfo {
 
             String aa = vc.getAttributeAsString("ESP_AA_AC", ".").replaceAll("\\[", "").replaceAll("\\]", "");
             String ea = vc.getAttributeAsString("ESP_EA_AC", ".").replaceAll("\\[", "").replaceAll("\\]", "");
+            String tac = vc.getAttributeAsString("ESP_TAC", ".").replaceAll("\\[", "").replaceAll("\\]", "");
             ESP.ESP_AA_AC = ESP.calcMAF(aa);
             ESP.ESP_EA_AC = ESP.calcMAF(ea);
             ESP.ESP_MAX_AA_EA = Math.max(ESP.ESP_AA_AC, ESP.ESP_EA_AC);
-
-            ESP.setESP_MAF(vc.getAttributeAsString("ESP_MAF", ".").replaceAll("\\[", "").replaceAll("\\]", ""));
+            ESP.ESP_MAF = ESP.calcMAF(tac);
         }
 
         // Search for this feature in the VariantInfoNameMap
@@ -189,7 +191,7 @@ public class VariantInfo {
     // Function returns the requested features for this variant.
     public String returnSummaryString(String geneId, ArrayList<String> PL, String filterType) {
 
-        int PRECISION = 6;
+        int PRECISION = 4;
         String ret = "";
         HashMap<String, String> returnValueMap = new HashMap<String, String>();
 
@@ -246,6 +248,10 @@ public class VariantInfo {
             tmp = tmp.replaceAll("'", "");
             dataList.add(tmp);
         }
+
+        // Append the Sample minor allele frequency (sample_MAF) to the dataList
+        dataList.add(dbl2str(sample_MAF, 2));
+
         String data_line = Joiner.on("\t").join(dataList) + "\n";
 
 
@@ -300,6 +306,24 @@ public class VariantInfo {
         if(candPatients.size() > 0) ret = true;
 
         return ret;
+    }
+
+    /*********************************************************************************************/
+    // Function returns the minor allele frequency (MAF) for all the subjects in the VCF file.
+    // The formula is: 1 - sum_over_i(genotype[0,1,2]) / (2*N)
+    // Where i = a subject, and N = number of subjects
+    public void calcSampleAF() {
+
+        double sum = 0;
+        double n = 0;
+        for(Genotype_Feature g : genotypeMap.values()) {
+            if(g.genotype_DNA_str.equalsIgnoreCase(".")) continue; // the variant wasn't called for this person so skip this instance
+            n++;
+            sum += g.genotypeInt;
+        }
+
+        double N = 2.0 * n;
+        sample_MAF = (1.0 - (sum / N)) * 100; // generally reported as a percent
     }
 
 

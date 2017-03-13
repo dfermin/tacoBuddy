@@ -17,9 +17,15 @@ public class VCFParser {
     static File inputVCF = null, inputVCF_tabix = null;
     static ArrayList<VariantContext> vcList = null;
 
+    // Constructor
     VCFParser(File vcf, File tbi) {
         inputVCF = vcf;
         inputVCF_tabix = tbi;
+
+        if(!inputVCF_tabix.exists()) {
+            System.err.print("\nERROR! Unable to find TABIX file " + inputVCF_tabix.getName() + "\n\n");
+            System.exit(0);
+        }
     }
 
 
@@ -33,8 +39,6 @@ public class VCFParser {
 
         int ctr = 1;
         for(String geneId: geneMap.keySet()) { // Iterate over the genes in the given geneMap
-
-
 
             for(Transcript curTS : geneMap.get(geneId)) { // Iterate over the transcripts for this gene
 
@@ -51,7 +55,10 @@ public class VCFParser {
                         VariantContext vc = it.next();
                         String chr = vc.getContig();
                         int pos = vc.getEnd();
-                        double svmProb = Double.parseDouble((String) vc.getAttribute("SVM_PROBABILITY"));
+                        double svmProb = Double.NaN;
+                        if( vc.getID().equalsIgnoreCase("SVM_PROBABILITY") )
+                            svmProb = Double.parseDouble((String) vc.getAttribute("SVM_PROBABILITY"));
+
                         String ref = vc.getReference().getDisplayString(); // get the reference Allele NT
                         String alt = vc.getAltAlleleWithHighestAlleleCount().getDisplayString(); // get the alternative Allele NT
 
@@ -69,6 +76,7 @@ public class VCFParser {
                         // Apply the jexl filter to this variant. If it passes the
                         if( VI.filter(filter) ) { // keep this variant because it met all of our filtering criteria.
                             VI.add(vc);
+                            VI.calcSampleAF();
 
                             if(VI.hasCandidateSubjects(filterType)) {
                                 ArrayList<String> patientGenotype = VI.getPatientData();
@@ -76,7 +84,7 @@ public class VCFParser {
                             }
                         }
 
-                        System.err.print(chr + ":" + pos + ref + ">" + alt + "\n"); // progress indicator
+                        //System.err.print(chr + ":" + pos + ref + ">" + alt + "\n"); // progress indicator
                     }
                 }
             }
