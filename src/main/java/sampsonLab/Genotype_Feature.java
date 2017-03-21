@@ -28,9 +28,18 @@ public class Genotype_Feature extends FeatureClass {
         if(G.isCalled()) {
             this.genotype_DNA_str = G.getGenotypeString();
 
-            if (G.isHet()) this.genotype_word = "HET";
-            else if (G.isHomRef()) this.genotype_word = "HOM";
-            else if (G.isHomVar()) this.genotype_word = "HOM_ALT";
+            if (G.isHet()) {
+                this.genotype_word = "HET";
+                this.genotypeInt = 1;
+            }
+            else if (G.isHomRef()) { // homozygous reference
+                this.genotype_word = "HOM";
+                this.genotypeInt = 0;
+            }
+            else if (G.isHomVar()) { // homozygous alternative
+                this.genotype_word = "HOM_ALT";
+                this.genotypeInt = 2;
+            }
 
             if (G.hasAD()) this.DP = G.getDP();
             if (G.hasGQ()) this.GQ = G.getGQ();
@@ -39,11 +48,6 @@ public class Genotype_Feature extends FeatureClass {
                 this.genotype_INT_str += (a.isReference() ? "1" : "0") + "|";
             }
             this.genotype_INT_str = this.genotype_INT_str.substring(0, this.genotype_INT_str.length() - 1);
-
-            if (this.genotype_INT_str.equalsIgnoreCase("0|0")) genotypeInt = 0;
-            if ((this.genotype_INT_str.equalsIgnoreCase("1|0")) ||
-                    (this.genotype_INT_str.equalsIgnoreCase("0|1"))) genotypeInt = 1;
-            if (this.genotype_INT_str.equalsIgnoreCase("1|1")) genotypeInt = 2;
         }
         else {
             this.genotype_DNA_str = ".";

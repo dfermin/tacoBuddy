@@ -5,10 +5,7 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
 
 import java.io.*;
-import java.lang.reflect.Array;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 
 
@@ -27,10 +24,8 @@ public class globalFunctions {
     static public Set<String> genesDOM = null;
     static public Set<String> genesREC = null;
     static public SortedSet<String> featureSet = null;
-    static public double popFilter = 0.01; // default value
-    static public String tsOutputModel = null;
     static public SetMultimap<String, Transcript> REC_geneMap = null, DOM_geneMap = null;
-    static public Map<String, String> customCalcsMap = null;
+    static public Map<String, String> allowedSitesMap = null;
 
 
 
@@ -84,12 +79,12 @@ public class globalFunctions {
 
             if(line.startsWith("genesDOM=")) {
                 genesDOM = new HashSet<String>();
-                String[] tmp = line.substring(9).split(",");
+                String[] tmp = line.substring(9).split("[,\\t;\\s]");
                 for(String s: tmp) genesDOM.add(s.replaceAll("\\s*", ""));
             }
             if(line.startsWith("genesREC=")) {
                 genesREC = new HashSet<String>();
-                String[] tmp = line.substring(9).split(",");
+                String[] tmp = line.substring(9).split("[,\\t;\\s]");
                 for(String s: tmp) genesREC.add(s.replaceAll("\\s*", ""));
             }
 
@@ -100,17 +95,22 @@ public class globalFunctions {
                 }
             }
 
-            if(line.startsWith("customCalc=")) {
-                if(customCalcsMap == null) customCalcsMap = new HashMap<String, String>();
-                String[] tmp = line.substring(11).split("=");
-                customCalcsMap.put(tmp[0], tmp[1]); // key = name of custom field, value = how to calculate it
+            if(line.startsWith("allowedSites")) {
+                if(null == allowedSitesMap) allowedSitesMap = new HashMap<String, String>();
+
+                String tmp, tag;
+                tmp = line.split("=")[0];
+                if(tmp.endsWith("REC")) tag = "REC";
+                else tag = "DOM";
+
+                for(String s : line.substring(16).split("[,;\\s]+")) {
+                    allowedSitesMap.put(s, tag);
+                }
             }
 
             if(line.startsWith("filterDOM=")) filterDOM = reformat_filter(line.substring(10));
             if(line.startsWith("filterREC=")) filterREC = reformat_filter(line.substring(10));
 
-            if(line.startsWith("popFilter=")) popFilter = Double.parseDouble(line.substring(10));
-            if(line.startsWith("tsOutputModel=")) tsOutputModel = line.substring(14);
         }
         br.close();
 
@@ -118,20 +118,21 @@ public class globalFunctions {
 
         // If you go this far you had an acceptable input file. Report all copied values to STDERR
         System.err.print("\n-------------------------------------------------------------\n");
-        if( !(null == inputVCF) )    System.err.print("inputVCF:     " + inputVCF.getCanonicalPath() + "\n");
-        if( !(null == srcGFF3) )     System.err.print("source GFF:   " + srcGFF3.getCanonicalPath() + "\n");
-        if( genesDOM.size() > 0 )  System.err.print("DOM genes:    " + genesDOM + "\n");
-        if( genesREC.size() > 0 )  System.err.print("REC genes:    " + genesREC + "\n");
+        if( !(null == inputVCF) ) System.err.print("inputVCF:     " + inputVCF.getCanonicalPath() + "\n");
+        if( !(null == srcGFF3) ) System.err.print("source GFF:   " + srcGFF3.getCanonicalPath() + "\n");
+        if( genesDOM.size() > 0 ) System.err.print("DOM genes:    " + genesDOM + "\n");
+        if( genesREC.size() > 0 ) System.err.print("REC genes:    " + genesREC + "\n");
         if( filterDOM != null ) System.err.print("DOM filters:  " + filterDOM + "\n");
         if( filterREC != null ) System.err.print("REC filters:  " + filterREC + "\n");
-        if( customCalcsMap != null ) {
-            System.err.print("Custom calculations:\n");
-            for(String k : customCalcsMap.keySet()) System.err.print("\t" + k + " = " + customCalcsMap.get(k) + "\n");
+        System.err.print("Selected output features: " + Joiner.on(", ").join(featureSet) + "\n");
+
+        if( !(null == allowedSitesMap) && (allowedSitesMap.size() > 0) ) {
+            System.err.print("Requested sites:\n");
+            for(String k : allowedSitesMap.keySet()) { System.err.println("  " + allowedSitesMap.get(k) + "\t" + k); }
         }
-        if( tsOutputModel.length() > 0 ) System.err.print("Output:       " + tsOutputModel + "\n");
+        //if( tsOutputModel.length() > 0 ) System.err.print("Output:       " + tsOutputModel + "\n");
         System.err.print("-------------------------------------------------------------\n\n");
     }
-
 
 
     private static void errorCheck_paramFile_input() {
@@ -166,8 +167,8 @@ public class globalFunctions {
         }
 
         score = 0;
-        if( filterDOM.length() > 0 ) score++;
-        if( filterREC.length() > 0 ) score++;
+        if( (null != filterDOM) && (filterDOM.length() > 0) ) score++;
+        if( (null != filterREC) && (filterREC.length() > 0) ) score++;
         if( score == 0 ) {
             System.err.println("\nERROR! You must provide a value for EITHER filterDOM or filterREC (or both) in the input file\n");
             System.exit(0);
@@ -176,6 +177,7 @@ public class globalFunctions {
 
 
     // Function reformats the user filter to make sure it will work with jexl
+    // Specifically it converts: /[AD] =~ SIFT/ to ('A' =~ SIFT) or ('D' =~ SIFT)
     private static String reformat_filter(String origFilter) {
         String ret = "";
         if(!origFilter.contains("/")) ret = origFilter;
@@ -223,7 +225,6 @@ public class globalFunctions {
 
 
 
-
     private static void writeTemplateInputFile() throws IOException {
         File templateF = new File("./tacoBuddy-inputTemplate.txt");
         FileWriter fw = new FileWriter(templateF);
@@ -242,13 +243,9 @@ public class globalFunctions {
         bw.write("\n# Enter regex-like filters there for genes. For 'or' conditions surround the whole regex in forward slashes. Example: /['DT'] =~ SIFT/\n");
         bw.write("\n# Score filters to apply to the variants in DOMINANT genes\nfilterDOM=\n");
         bw.write("\n# Score filters to apply to the variants in RECESSIVE genes\nfilterREC=\n");
-        bw.write("\npopFilter=0.01\n");
-        bw.write("\n# The transcript model to report results for.\n#" +
-                "Possible options are LT(longest transcript), MCT(most conserved transcript)\n" +
-                "tsOutputModel=\n");
-//        bw.write("\n# If you have custom calculations you want to do you place them here. For each distinct" +
-//                "calculation you want to do add a new 'customCalc=' line. An example is provided here.\n" +
-//                "#customCalc=MAX_ESP_AA_EA=max(ESP_AA_AC, ESP_AE_AC\n");
+        bw.write("\n# Include data for these variants regardless of their filter scores\n" +
+                "# Variant syntax: chromosome:position\n" +
+                "# Multiple sites can be given as comma separated.\n#allowedSitesDOM=\n#allowedSitesREC=\n");
         bw.write("\n");
         bw.close();
 

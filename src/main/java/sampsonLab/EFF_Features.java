@@ -15,7 +15,7 @@ public class EFF_Features extends FeatureClass {
 
         eff = new HashMap<String, String>();
 
-        String[] inputAry = ss.split(",");
+        String[] inputAry = ss.replaceAll("[\\[\\]]+", "").split(",");
 
         for(String s : inputAry) {
 
@@ -40,7 +40,7 @@ public class EFF_Features extends FeatureClass {
     public String findTS(String search_str) {
         String ret = "no_match";
 
-        if(eff.containsKey(search_str)) {
+        if(eff.containsKey(search_str.replaceAll("\\.\\d+$", ""))) {
             ret = eff.get(search_str);
         }
         return ret;

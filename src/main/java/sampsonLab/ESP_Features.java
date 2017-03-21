@@ -13,10 +13,10 @@ public class ESP_Features extends FeatureClass {
     public double ESP_MAX_AA_EA;
 
     public ESP_Features() {
-        ESP_AA_AC = -1;
-        ESP_EA_AC = -1;
-        ESP_MAF = -1;
-        ESP_MAX_AA_EA = -1;
+        ESP_AA_AC = 100;
+        ESP_EA_AC = 100;
+        ESP_MAF = 100;
+        ESP_MAX_AA_EA = 100;
     }
 
 
@@ -31,7 +31,7 @@ public class ESP_Features extends FeatureClass {
         // For 'ESP6500SI-V2-SSA137.GRCh38-liftover' vcf file which we are using,
         // the syntax for ESP Allele Count is in the order of AltAlleles,RefAllele.
 
-        if(AC_str.equalsIgnoreCase(".")) return 0.0;
+        if(AC_str.equalsIgnoreCase(".")) return 100.0;
 
         // record all of the allele counts
         for(String s : AC_str.split(",")) {
@@ -51,7 +51,7 @@ public class ESP_Features extends FeatureClass {
         if(AF.size() > 1) MAF_ret = Math.exp(AF.get(1)); // convert back to linear-scale!!!
         else MAF_ret = Math.exp(AF.get(0));  // convert back to linear-scale!!!
 
-        return ( MAF_ret * 100 ); // we return a percentage so multiply it by 100
+        return ( MAF_ret );
     }
 
 

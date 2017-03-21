@@ -11,9 +11,6 @@ import java.util.Map;
 
 import apple.laf.JRSUIConstants;
 import com.google.common.base.Joiner;
-import htsjdk.samtools.util.CloseableIterator;
-import htsjdk.variant.variantcontext.VariantContext;
-import htsjdk.variant.vcf.*;
 import org.apache.commons.cli.ParseException;
 
 
@@ -45,10 +42,8 @@ public class tacoBuddy {
 
 
         // Print header line
-        String hdr = "#SAMPLE\tGenotype\tFilter\tGene_Name\tCoord (hg19)\t";
+        String hdr = "#SAMPLE\tGenotype\tTranscriptID\tGene_Name\tchrom\tpos\tREF\tALT\t";
         hdr += Joiner.on("\t").join(globalFunctions.featureSet);
-        hdr += "\tSample_AF_percent";
-        hdr = hdr.replaceAll("EFF\t", "");
         System.out.println(hdr);
 
         // Record any variants that land within the exons of the genes stored in DOM and REC maps

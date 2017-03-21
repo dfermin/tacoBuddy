@@ -5,9 +5,8 @@ import htsjdk.variant.variantcontext.Genotype;
 import htsjdk.variant.variantcontext.VariantContext;
 import org.apache.commons.jexl3.*;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.TreeSet;
+import java.util.*;
+import java.util.regex.Pattern;
 
 /**
  * Created by dfermin on 1/5/17.
@@ -18,13 +17,16 @@ public class VariantInfo {
     public String REF;
     public String ALT;
     public String snp_id;
-    public int passedFilter; // 0 = false, 1 = true
+    public int allowedSite; // -1 = not allowed, 0 = DOM, 1 = REC
+    public boolean passedFilter;
 
     public double svmProb;
     public double sample_MAF; // minor allele frequency for the samples
 
     public HashMap<String, Genotype_Feature> genotypeMap; // k = sampleID, v = genotype_feature object for this subject
-    public TreeSet<String> candPatients;
+    public SortedSet<String> candPatients;
+
+    public HashMap<String, Object> userFeatures; // k = feature name, v = object (String, double, int, etc..)
 
     // These object only get initialized if the user decides to use them
     public ESP_Features ESP = null;
@@ -39,74 +41,106 @@ public class VariantInfo {
         this.REF = ref;
         this.ALT = alt;
         this.svmProb = 0.0;
-        this.passedFilter = 0;
+        this.passedFilter = false;
         this.sample_MAF = -1.0;
+        this.allowedSite = -1;
 
         // construct snp_id string
-        snp_id = chr + ":" + String.valueOf(pos) + ":" + REF + ">" + ALT;
+        snp_id = chr + ":" + String.valueOf(pos);
+
+        userFeatures = new HashMap<String, Object>();
 
         ESP = new ESP_Features();
         dbNSFP = new dbNSFP_Features();
 
         genotypeMap = new HashMap<String, Genotype_Feature>();
         candPatients = new TreeSet<String>();
+
+        this.checkAllowedSites();
     }
 
 
     public String getID() { return snp_id; }
     public void setSvmProb(double d) { this.svmProb = d; }
 
+    /*********************************************************************************************/
+    // Function checks to see if this variant is among the variants the user gave in the 'allowedSites' fields of the input file.
+    private void checkAllowedSites() {
+        String search_str = chr + ":" + String.valueOf(pos);
+
+        // user gave no allowedSites input.
+        if( null == globalFunctions.allowedSitesMap ) {
+            this.allowedSite = -1;
+            return;
+        }
+
+        for(String k : globalFunctions.allowedSitesMap.keySet()) {
+            if(search_str.equalsIgnoreCase(k)) {
+                if(globalFunctions.allowedSitesMap.get(k).equalsIgnoreCase("DOM")) this.allowedSite = 0;
+                else if(globalFunctions.allowedSitesMap.get(k).equalsIgnoreCase("REC")) this.allowedSite = 1;
+                break;
+            }
+        }
+    }
+
+
 
     /*********************************************************************************************/
     // Function records the requested data from the attributes of the variant object
-    public boolean fetchFeature(String feat, VariantContext vc) {
+    public boolean fetchFeature(String feat, VariantContext vc, String transcriptID) {
+
+        // You only need the transcriptID if the user requested 'EFF' as a filter criteria
 
         if(feat.startsWith("ESP_")) {
-            ESP = new ESP_Features();
 
             String aa = vc.getAttributeAsString("ESP_AA_AC", ".").replaceAll("\\[", "").replaceAll("\\]", "");
             String ea = vc.getAttributeAsString("ESP_EA_AC", ".").replaceAll("\\[", "").replaceAll("\\]", "");
             String tac = vc.getAttributeAsString("ESP_TAC", ".").replaceAll("\\[", "").replaceAll("\\]", "");
+
             ESP.ESP_AA_AC = ESP.calcMAF(aa);
             ESP.ESP_EA_AC = ESP.calcMAF(ea);
             ESP.ESP_MAX_AA_EA = Math.max(ESP.ESP_AA_AC, ESP.ESP_EA_AC);
             ESP.ESP_MAF = ESP.calcMAF(tac);
+
+            userFeatures.put("ESP_AA_AC", ESP.ESP_AA_AC);
+            userFeatures.put("ESP_EA_AC", ESP.ESP_EA_AC);
+            userFeatures.put("ESP_MAX_AA_EA",ESP.ESP_MAX_AA_EA);
+
+            return true;
         }
 
-        // Search for this feature in the VariantInfoNameMap
-        // If you get a match, record the relevant data for that feature
-        if( tacoBuddy.VCF_Info_Name_Map.inMap(feat.toUpperCase()) ) {
-            String k = tacoBuddy.VCF_Info_Name_Map.getValue(feat.toUpperCase());
-
-            String v_str = vc.getAttributeAsString(k, "#NULL");
-            v_str = v_str.replaceAll("\\[", "").replaceAll("\\]", "");
-
-            if( !v_str.equalsIgnoreCase("#NULL") ) {
-
-                if (feat.equalsIgnoreCase("EFF")) {
-                    EFF = new EFF_Features(v_str);
-                }
-                if (feat.equalsIgnoreCase("MutationTaster")) {
-                    if (dbNSFP == null) dbNSFP = new dbNSFP_Features();
-                    dbNSFP.mutationTaster = formatStringForJexl(v_str);
-                }
-
-                if (feat.equalsIgnoreCase("GERP")) {
-                    if (dbNSFP == null) dbNSFP = new dbNSFP_Features();
-                    dbNSFP.GERP__RS = Double.valueOf(v_str);
-                }
-
-                if (feat.equalsIgnoreCase("Polyphen2_Hvar")) {
-                    if (dbNSFP == null) dbNSFP = new dbNSFP_Features();
-                    dbNSFP.polyphen2_hvar = formatStringForJexl(v_str);
-                }
-
-                if (feat.equalsIgnoreCase("sift")) {
-                    if (dbNSFP == null) dbNSFP = new dbNSFP_Features();
-                    dbNSFP.SIFT = formatStringForJexl(v_str);
-                }
-            }
+        if(feat.equalsIgnoreCase("POLYPHEN2_HVAR")) {
+            String tmp = vc.getAttribute("dbNSFP_Polyphen2_HVAR_pred", "#NULL").toString().replaceAll("[\\[\\]\\s]+", "");
+            userFeatures.put(feat, tmp);
         }
+
+        if(feat.equalsIgnoreCase("GERP")) {
+            String tmp = vc.getAttribute("dbNSFP_GERP___RS", "NaN").toString().replaceAll("[\\[\\]\\s]+", "");
+            String[] ary = tmp.split(",");
+            userFeatures.put(feat, Double.valueOf(ary[0]));
+        }
+
+        if(feat.equalsIgnoreCase("MUTATIONTASTER")) {
+            userFeatures.put(feat, vc.getAttribute("dbNSFP_MutationTaster_pred", "#NULL"));
+        }
+
+        if(feat.equalsIgnoreCase("SIFT")){
+            String tmp = vc.getAttributeAsString("dbNSFP_SIFT_pred", "#NULL").toString().replaceAll("[\\[\\]\\s]+", "");
+            userFeatures.put(feat,tmp);
+        }
+
+        if(feat.equalsIgnoreCase("EFF")) {
+            String tmp = vc.getAttributeAsString("EFF", "#NULL");
+            EFF = new EFF_Features(tmp);
+            tmp = transcriptID.replaceAll("\\.\\d+$", "");
+            userFeatures.put(feat, EFF.findTS(tmp));
+        }
+
+        if(feat.equalsIgnoreCase("IS_LOF")) {
+            String tmp = vc.getAttributeAsString("LOF", "#NULL");
+            if(tmp.equalsIgnoreCase("#NULL")) userFeatures.put(feat, "false");
+        }
+
 
         return true; // if you got here then you had no problems in this function
     }
@@ -114,161 +148,111 @@ public class VariantInfo {
 
     /*********************************************************************************************/
     // Function applies the user's filter to this variant. Calling this function assumes VariantInfo::fetchFeature()
-    // ran successfully. The curTS_ID is only needed if the user requested to evaluate the 'EFF' info field.
-    public boolean filter(String jexl_filter_str) {
-
-        // The ++ string breaks jexl so we strip it out. It should only occur in the GERP++ name anyways
-        if(jexl_filter_str.contains("++")) {
-            String tmp = jexl_filter_str.replaceAll("\\+\\+", "");
-            jexl_filter_str = tmp;
-            tmp = null;
-        }
-
-        // The '/' string breaks jexl so we strip it out. It should only occur in the GERP++ name anyways
-        if(jexl_filter_str.contains("/")) {
-            String tmp = jexl_filter_str.replaceAll("/", "");
-            jexl_filter_str = tmp;
-            tmp = null;
-        }
-
-        JexlEngine jexl = new JexlBuilder().cache(512).strict(true).silent(false).create(); // Create a jexl engine
-        JexlExpression expr = jexl.createExpression(jexl_filter_str); // define the expression you want to test/use
-
-        // Create a MapContext object and populate it with the variables that are in VariantInfo objects
-        JexlContext jc = new MapContext();
-
-        if(dbNSFP != null) prepContextMap(dbNSFP, jc);
-        if(ESP != null) prepContextMap(ESP, jc);
-        if(EFF != null) prepContextMap(EFF, jc);
+    // ran successfully.
+    public boolean passesFilter(String jexl_filter_str) {
 
         boolean retVal = false;
-        retVal = (Boolean) expr.evaluate(jc);
 
-        if(retVal) passedFilter = 1;
+        // check to see if this current variant is among the sites the user specified as 'allowedSites'
+        if(this.allowedSite > -1) {
+            passedFilter = true;
+            retVal = true;
+        }
+        else {
+
+            JexlEngine jexl = new JexlBuilder().cache(512).strict(true).silent(false).create(); // Create a jexl engine
+            JexlExpression expr = jexl.createExpression(jexl_filter_str); // define the expression you want to test/use
+
+            // Create a MapContext object and populate it with the variables that are in VariantInfo objects
+            JexlContext jc = new MapContext();
+
+            jc.set("SAMPLE_MAF", sample_MAF);
+
+            for(String k : this.userFeatures.keySet()) {
+                Object o = this.userFeatures.get(k);
+                String dataType = o.getClass().getSimpleName();
+
+                if(dataType.equalsIgnoreCase("Double")) {
+                    jc.set(k, o);
+                }
+
+                if(dataType.equalsIgnoreCase("String")) {
+                    jc.set(k, formatStringForJexl((String) o));
+                }
+            }
+            retVal = (Boolean) expr.evaluate(jc);
+
+            if (retVal) passedFilter = true;
+        }
 
         return retVal;
     }
 
 
     /*********************************************************************************************/
-    // Function to populate the jexlContext map with the variables the user has elected to filter on
-    private void prepContextMap(Object o, JexlContext jc) {
-
-        String dataType = o.getClass().getSimpleName();
-
-        if(dataType.equalsIgnoreCase("dbNSFP_Features")) {
-            jc.set("GERP", dbNSFP.GERP__RS);
-            jc.set("MUTATIONTASTER", dbNSFP.mutationTaster);
-            jc.set("POLYPHEN2_HVAR", dbNSFP.polyphen2_hvar);
-            jc.set("SIFT", dbNSFP.SIFT);
-        }
-
-        if(dataType.equalsIgnoreCase("ESP_Features")) {
-            jc.set("ESP_MAX_AA_EA", ESP.ESP_MAX_AA_EA);
-            jc.set("ESP_MAF", ESP.ESP_MAF);
-        }
-
-        if(dataType.equalsIgnoreCase("EFF_Features")) {
-            jc.set("EFF", EFF.returnJexlArray());
-        }
-    }
-
-    /*********************************************************************************************/
     // Function formats the given string so that Jexl will view it as an array.
     // This function assumes the data passed to it is comma separated
     private String formatStringForJexl(String inputStr) {
         String ret = "";
-        ArrayList<String> A = new ArrayList<String>();
+        HashSet<String> S = new HashSet<String>();
         for(String s : inputStr.split(",")) {
             String tmp = "'" + s.trim() + "'";
-            A.add(tmp);
+            S.add(tmp);
         }
-        ret = "[" + Joiner.on(",").join(A) + "]";
+        ret = "[" + Joiner.on(",").join(S) + "]";
         return ret;
     }
 
+
     /*********************************************************************************************/
-    // Function returns the requested features for this variant.
-    public String returnSummaryString(String geneId, ArrayList<String> PL, String filterType) {
+    // Function returns a non-redundant representation of the given string
+    private String makeStringNR(String s) {
+        String ret = formatStringForJexl(s);
+        return(ret.replaceAll("[\\[\\]\\s']+", ""));
+    }
 
-        int PRECISION = 4;
-        String ret = "";
-        HashMap<String, String> returnValueMap = new HashMap<String, String>();
 
-        for(String feat : globalFunctions.featureSet) {
+    /**********************************************************************************************/
+    public void printSummaryString (String geneId, String transcriptID) {
+        int PRECISION = 3;
 
-            returnValueMap.put(feat, "#NULL"); // Initialize map and update it as data is encountered
+        for(String k : this.candPatients) {
+            Genotype_Feature gf = genotypeMap.get(k);
+            ArrayList<String> ary = new ArrayList<String>();
 
-            // Special case where you have to iterate over the transcripts.
-            if (feat.equalsIgnoreCase("EFF")) {
-                // output is too long so skip this case
-                continue;
+            if(this.allowedSite == 0 && gf.genotype_word == "HOM_ALT") continue;
+            if(this.allowedSite == 1 && gf.genotype_word != "HOM_ALT") continue;
+
+            ary.add(k);
+            ary.add(gf.genotype_word);
+            ary.add(transcriptID);
+            ary.add(geneId);
+            ary.add(this.chr);
+            ary.add(String.valueOf(this.pos));
+            ary.add(this.REF);
+            ary.add(this.ALT);
+
+            for(String feat : globalFunctions.featureSet) {
+                if(this.userFeatures.containsKey(feat)) {
+
+                    Object o = this.userFeatures.get(feat);
+                    if (o.getClass().getSimpleName().equalsIgnoreCase("double")) {
+                        double d = (Double) o;
+                        ary.add(dbl2str(d, PRECISION, false));
+                    } else {
+                        String tmp = (String) this.userFeatures.get(feat);
+                        ary.add( this.makeStringNR(tmp) );
+                    }
+                }
+                else ary.add("#NULL");
             }
 
-            if (feat.equalsIgnoreCase("MUTATIONTASTER")) {
-                returnValueMap.put(feat, dbNSFP.mutationTaster);
-                continue;
-            }
-            if (feat.equalsIgnoreCase("POLYPHEN2_HVAR")) {
-                returnValueMap.put(feat, dbNSFP.polyphen2_hvar);
-                continue;
-            }
-            if (feat.equalsIgnoreCase("SIFT")) {
-                returnValueMap.put(feat, dbNSFP.SIFT);
-                continue;
-            }
-            if (feat.equalsIgnoreCase("GERP")) {
-                returnValueMap.put(feat, dbl2str(dbNSFP.GERP__RS, PRECISION));
-                continue;
-            }
+            String line = Joiner.on("\t").join(ary);
+            System.out.println(line.replaceAll("#NULL", "."));
 
-            if(feat.equalsIgnoreCase("ESP_AA_AC")) {
-                returnValueMap.put(feat, dbl2str(ESP.ESP_AA_AC, PRECISION) );
-                continue;
-            }
-            if(feat.equalsIgnoreCase("ESP_EA_AC")) {
-                returnValueMap.put(feat, dbl2str(ESP.ESP_EA_AC, PRECISION) );
-                continue;
-            }
-            if(feat.equalsIgnoreCase("ESP_MAF")) {
-                returnValueMap.put(feat, dbl2str(ESP.ESP_MAF, PRECISION) );
-                continue;
-            }
-            if(feat.equalsIgnoreCase("ESP_MAX_AA_EA")) {
-                returnValueMap.put(feat, dbl2str(ESP.ESP_MAX_AA_EA, PRECISION) );
-                continue;
-            }
+            ary.clear();
         }
 
-        // Now construct the return string based upon the data in returnValueMap.
-        ArrayList<String> dataList = new ArrayList<String>();
-        for(String feat : globalFunctions.featureSet) {
-            String tmp = returnValueMap.get(feat);
-            if(tmp.matches("\\['.'\\]")) tmp = tmp.replaceAll("\\['", "").replaceAll("'\\]", "");
-            tmp = tmp.replaceAll("'", "");
-            dataList.add(tmp);
-        }
-
-        // Append the Sample minor allele frequency (sample_MAF) to the dataList
-        dataList.add(dbl2str(sample_MAF, 2));
-
-        String data_line = Joiner.on("\t").join(dataList) + "\n";
-
-
-        TreeSet<String> patientLines_toMerge = new TreeSet<String>();
-        for(String sampleId : PL) {
-            Genotype_Feature gf = this.genotypeMap.get(sampleId);
-
-            // We generally aren't interested in people who are homologous for the reference alleles in domiant genes so skip them
-            if(gf.genotype_word.equalsIgnoreCase("HOM") && filterType.equalsIgnoreCase("DOM")) continue;
-
-            String tmp = gf.getInfo() + "\t" + filterType + "\t" + geneId + "\t" + snp_id + "\t" + data_line;
-            patientLines_toMerge.add(tmp);
-        }
-
-        ret = Joiner.on("").join(patientLines_toMerge);
-
-        return ret;
     }
 
     /*********************************************************************************************/
@@ -281,26 +265,18 @@ public class VariantInfo {
             Genotype_Feature gf = new Genotype_Feature(s, G);
             genotypeMap.put(s, gf);
         }
+
+        this.calcSampleAF();
     }
 
 
     /*********************************************************************************************/
-    // Function returns true if at least 1 subject in the genotypeMap meets the filtering requirements
+    // Function returns true if at least 1 subject in the genotypeMap meets the filtering requirements for this variant
     public boolean hasCandidateSubjects(String filterType) {
         boolean ret = false;
 
         for(Genotype_Feature g : genotypeMap.values()) {
-
-            // For dominant genes (DOM) you need to be heterozygous or homologous-domiant
-            if(filterType.equalsIgnoreCase("DOM")) {
-                if( g.genotype_word.equalsIgnoreCase("HET") ||
-                     g.genotype_word.equalsIgnoreCase("HOM") ) candPatients.add(g.sampleID);
-            }
-
-            // For recessive genes (REC) you need to be homologous-recessive
-            if(filterType.equalsIgnoreCase("REC")) {
-                if( g.genotype_word.equalsIgnoreCase("HOM_ALT") ) candPatients.add(g.sampleID);
-            }
+            candPatients.add(g.sampleID);
         }
 
         if(candPatients.size() > 0) ret = true;
@@ -316,6 +292,7 @@ public class VariantInfo {
 
         double sum = 0;
         double n = 0;
+
         for(Genotype_Feature g : genotypeMap.values()) {
             if(g.genotype_DNA_str.equalsIgnoreCase(".")) continue; // the variant wasn't called for this person so skip this instance
             n++;
@@ -323,21 +300,19 @@ public class VariantInfo {
         }
 
         double N = 2.0 * n;
-        sample_MAF = (1.0 - (sum / N)) * 100; // generally reported as a percent
+        double tmp = (sum / N);
+        if(Double.isNaN(tmp)) sample_MAF = 0;
+        else sample_MAF = tmp;
     }
 
-
-    /*********************************************************************************************/
-    // Function returns the information for the patients in 'candPatients'
-    public ArrayList<String> getPatientData() {
-        ArrayList<String> ret = new ArrayList<String>(this.candPatients);
-        return ret;
-    }
 
 
     /*********************************************************************************************/
     // Manually round the given double to a specific number of digits and return a String with it's value
-    private static String dbl2str(double d, int precision) {
+    private static String dbl2str(double d, int precision, boolean returnPercent) {
+
+        if(returnPercent) d *= 100.0;
+
         String t = "%." + Integer.toString(precision) + "f";
 
         String compStr = "0.";

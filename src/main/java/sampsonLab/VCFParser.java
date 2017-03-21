@@ -6,6 +6,7 @@ import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.vcf.VCFFileReader;
 
 import java.io.File;
+import java.sql.SQLException;
 import java.util.ArrayList;
 
 
@@ -18,7 +19,7 @@ public class VCFParser {
     static ArrayList<VariantContext> vcList = null;
 
     // Constructor
-    VCFParser(File vcf, File tbi) {
+    VCFParser(File vcf, File tbi) throws SQLException {
         inputVCF = vcf;
         inputVCF_tabix = tbi;
 
@@ -38,6 +39,7 @@ public class VCFParser {
         VCFFileReader vcfr = new VCFFileReader(inputVCF, inputVCF_tabix);
 
         int ctr = 1;
+        int FLANK = 2;
         for(String geneId: geneMap.keySet()) { // Iterate over the genes in the given geneMap
 
             for(Transcript curTS : geneMap.get(geneId)) { // Iterate over the transcripts for this gene
@@ -48,39 +50,39 @@ public class VCFParser {
                     // exons for this transcript
                     CloseableIterator<VariantContext> it = vcfr.query(
                             curTS.getTrimmedChrom(),
-                            curE.exonStart,
-                            curE.exonEnd);
+                            (curE.exonStart - FLANK),
+                            (curE.exonEnd + FLANK));
 
                     while(it.hasNext()) {
                         VariantContext vc = it.next();
                         String chr = vc.getContig();
                         int pos = vc.getEnd();
                         double svmProb = Double.NaN;
+
                         if( vc.getID().equalsIgnoreCase("SVM_PROBABILITY") )
                             svmProb = Double.parseDouble((String) vc.getAttribute("SVM_PROBABILITY"));
 
                         String ref = vc.getReference().getDisplayString(); // get the reference Allele NT
                         String alt = vc.getAltAlleleWithHighestAlleleCount().getDisplayString(); // get the alternative Allele NT
 
-
                         VariantInfo VI = new VariantInfo(chr, pos, ref, alt);
                         VI.setSvmProb(svmProb);
+                        VI.add(vc);
 
+
+                        // Iterate over the features in 'featureSet'
+                        // Record all of these features for the current 'VI' object
                         for(String s : globalFunctions.featureSet) {
-                            if( !VI.fetchFeature(s, vc) ) {
+                            if( !VI.fetchFeature(s, vc, curTS.getTranscriptID()) ) {
                                 System.err.println("\nERROR with variant: " + VI.getID() + ":\nTrying to get " + s + "\n");
                                 System.exit(1);
                             }
                         }
 
-                        // Apply the jexl filter to this variant. If it passes the
-                        if( VI.filter(filter) ) { // keep this variant because it met all of our filtering criteria.
-                            VI.add(vc);
-                            VI.calcSampleAF();
+                        if( VI.passesFilter(filter) ) { // keep this variant because it met all of our filtering criteria.
 
                             if(VI.hasCandidateSubjects(filterType)) {
-                                ArrayList<String> patientGenotype = VI.getPatientData();
-                                System.out.print(VI.returnSummaryString(geneId, patientGenotype, filterType));
+                                VI.printSummaryString(geneId, curTS.getTranscriptID());
                             }
                         }
 
