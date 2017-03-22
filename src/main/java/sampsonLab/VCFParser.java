@@ -111,8 +111,6 @@ public class VCFParser {
                                 VI.printSummaryString(geneId, curTS.getTranscriptID());
                             }
                         }
-
-                        //System.err.print(chr + ":" + pos + ref + ">" + alt + "\n"); // progress indicator
                     }
                 }
             }
@@ -167,12 +165,11 @@ public class VCFParser {
                         }
                     }
 
-                    if(VI.getID().equalsIgnoreCase("1:179521754")) {
-                        int debug = 1;
-                    }
+//                    if(VI.getID().equalsIgnoreCase("1:179533850")) {
+//                        int debug = 1;
+//                    }
 
                     if (VI.passesFilter(filter)) { // keep this variant because it met all of our filtering criteria.
-
                         if (VI.hasCandidateSubjects(filterType)) {
                             VI.printSummaryString(geneId, curTS.getTranscriptID());
                         }

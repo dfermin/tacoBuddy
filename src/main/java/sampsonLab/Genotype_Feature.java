@@ -14,7 +14,7 @@ public class Genotype_Feature extends FeatureClass {
     public String genotype_INT_str; // genotype represented as numbers, example: 0/1, 1/1, 0/0, 1/0
     public int genotypeInt; // 0 = homologous dominant, 1 = heterozygous, 2 = homologous recessive
     public int DP, GQ;
-    public String genotype_word; // HOM HET or HOM_ALT
+    public String genotype_word; // HOM, HET or HOM_ALT
 
     public Genotype_Feature(String id, Genotype G) {
         this.sampleID = id;
@@ -23,7 +23,7 @@ public class Genotype_Feature extends FeatureClass {
         this.genotypeInt = -1;
         this.DP = -1;
         this.GQ = -1;
-        this.genotype_word = "";
+        this.genotype_word = "#NULL";
 
         if(G.isCalled()) {
             this.genotype_DNA_str = G.getGenotypeString();

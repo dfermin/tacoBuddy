@@ -32,8 +32,8 @@ public class tacoBuddy {
 
         if( args.length < 1 ) {
             System.err.print("\nUSAGE: java -jar tacoBuddy.jar -i <input_file> or -t or -L <vcf.gz>\n" +
-                    "-t to generate template input file\n" +
-                    "-L list all the available INFO fields you can query or fetch from the given VCF.gz file\n\n");
+                    "\t-t to generate template input file\n" +
+                    "\t-L list all the available INFO fields you can query or fetch from the given VCF.gz file\n\n");
             return;
         }
 

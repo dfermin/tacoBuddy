@@ -137,8 +137,11 @@ public class VariantInfo {
         }
 
         if(feat.equalsIgnoreCase("IS_LOF")) {
-            String tmp = vc.getAttributeAsString("LOF", "#NULL");
-            if(tmp.equalsIgnoreCase("#NULL")) userFeatures.put(feat, "false");
+            if( vc.hasAttribute("LOF") ) {
+                String tmp = vc.getAttributeAsString("LOF", "#NULL");
+                if (tmp.equalsIgnoreCase("#NULL")) userFeatures.put(feat, "false");
+            }
+            else userFeatures.put(feat, "false");
         }
 
 
@@ -220,9 +223,6 @@ public class VariantInfo {
             Genotype_Feature gf = genotypeMap.get(k);
             ArrayList<String> ary = new ArrayList<String>();
 
-            if(this.allowedSite == 0 && gf.genotype_word == "HOM_ALT") continue;
-            if(this.allowedSite == 1 && gf.genotype_word != "HOM_ALT") continue;
-
             ary.add(k);
             ary.add(gf.genotype_word);
             ary.add(transcriptID);
@@ -276,6 +276,19 @@ public class VariantInfo {
         boolean ret = false;
 
         for(Genotype_Feature g : genotypeMap.values()) {
+
+            if(g.genotype_word.equalsIgnoreCase("#NULL")) continue; // no information for this variant in this sample so skip it.
+
+            // This is a variant that is not in 'allowedSites' and the current subject is homozygous dominant so skip it..
+            if( this.allowedSite < 0 && g.genotype_word.equalsIgnoreCase("HOM") ) continue;
+
+            // This is a variant in the Dominant 'allowedSites' category but the current subject is homozygous recessive so skip it..
+            if( this.allowedSite == 0 && g.genotype_word.equalsIgnoreCase("HOM_ALT") ) continue;
+
+
+            // Only report 'allowedSites' from the Recessive category if the subject is HOM_ALT for this variant
+            if( this.allowedSite == 1 && !g.genotype_word.equalsIgnoreCase("HOM_ALT") ) continue;
+
             candPatients.add(g.sampleID);
         }
 
