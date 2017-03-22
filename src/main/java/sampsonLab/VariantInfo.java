@@ -311,6 +311,8 @@ public class VariantInfo {
     // Manually round the given double to a specific number of digits and return a String with it's value
     private static String dbl2str(double d, int precision, boolean returnPercent) {
 
+        if(Double.isNaN(d)) return "#NULL"; // quick and dirty fix to 'NaN' values
+
         if(returnPercent) d *= 100.0;
 
         String t = "%." + Integer.toString(precision) + "f";

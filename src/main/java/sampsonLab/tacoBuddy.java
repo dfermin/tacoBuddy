@@ -31,7 +31,9 @@ public class tacoBuddy {
 
 
         if( args.length < 1 ) {
-            System.err.print("\nUSAGE: java -jar tacoBuddy.jar -i <input_file> or -t (to generate template input file)\n\n");
+            System.err.print("\nUSAGE: java -jar tacoBuddy.jar -i <input_file> or -t or -L <vcf.gz>\n" +
+                    "-t to generate template input file\n" +
+                    "-L list all the available INFO fields you can query or fetch from the given VCF.gz file\n\n");
             return;
         }
 
@@ -47,8 +49,16 @@ public class tacoBuddy {
         System.out.println(hdr);
 
         // Record any variants that land within the exons of the genes stored in DOM and REC maps
-        if(globals.DOM_geneMap.size() > 0) the_vcf_parser.parse(globals.DOM_geneMap, globals.filterDOM, "DOM");
-        if(globals.REC_geneMap.size() > 0) the_vcf_parser.parse(globals.REC_geneMap, globals.filterREC, "REC");
+        if(globals.queryMode.equalsIgnoreCase("exon")) {
+            if (globals.DOM_geneMap.size() > 0) the_vcf_parser.parseByExon(globals.DOM_geneMap, globals.filterDOM, "DOM");
+            if (globals.REC_geneMap.size() > 0) the_vcf_parser.parseByExon(globals.REC_geneMap, globals.filterREC, "REC");
+        }
+
+        if(globals.queryMode.equalsIgnoreCase("transcript")) {
+            if (globals.DOM_geneMap.size() > 0) the_vcf_parser.parseByTranscript(globals.DOM_geneMap, globals.filterDOM, "DOM");
+            if (globals.REC_geneMap.size() > 0) the_vcf_parser.parseByTranscript(globals.REC_geneMap, globals.filterREC, "REC");
+        }
+
 
     }
 

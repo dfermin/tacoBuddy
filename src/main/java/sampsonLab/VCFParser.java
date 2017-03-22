@@ -8,6 +8,8 @@ import htsjdk.variant.vcf.VCFFileReader;
 import java.io.File;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.TreeMap;
 
 
 /**
@@ -29,9 +31,33 @@ public class VCFParser {
         }
     }
 
+    /*****************************************************************************************************************/
+    // Function prints out all of the unique INFO fields the user can query in the VCF file
+    public void getINFOfields() {
+        TreeMap<String, String> infoMap = new TreeMap<String, String>();
+        VCFFileReader vcfr = new VCFFileReader(inputVCF, inputVCF_tabix);
 
-    // Parse the VCF file, keeping only the variant calls that overlap with our genes of interest and meet our filtering
-    public void parse(SetMultimap<String, Transcript> geneMap, String filter, String filterType) {
+        CloseableIterator<VariantContext> it = vcfr.iterator();
+        while(it.hasNext()) {
+            VariantContext vc = it.next();
+            for(String k : vc.getAttributes().keySet()) {
+                Object o = vc.getAttribute(k);
+                infoMap.put(k, o.getClass().getSimpleName());
+            }
+        }
+        vcfr.close();
+
+        System.out.print("\n#INFO field\tdata type\n");
+        for(String k : infoMap.keySet()) {
+            System.out.println(k + "\t" + infoMap.get(k));
+        }
+
+    }
+
+
+    /*****************************************************************************************************************/
+    // Parse the VCF file, keeping only the variant calls that overlap with the exons of our genes of interest and meet our filtering
+    public void parseByExon(SetMultimap<String, Transcript> geneMap, String filter, String filterType) {
 
         vcList = new ArrayList<VariantContext>();
 
@@ -87,6 +113,69 @@ public class VCFParser {
                         }
 
                         //System.err.print(chr + ":" + pos + ref + ">" + alt + "\n"); // progress indicator
+                    }
+                }
+            }
+        }
+    }
+
+
+    /*****************************************************************************************************************/
+    // Parse the VCF file, keeping only the variant calls that overlap with our transcripts of interest and meet our filtering
+    public void parseByTranscript(SetMultimap<String, Transcript> geneMap, String filter, String filterType) {
+
+        vcList = new ArrayList<VariantContext>();
+
+        // This command only works if you have the tabix tbi file for the input VCF
+        VCFFileReader vcfr = new VCFFileReader(inputVCF, inputVCF_tabix);
+
+        int ctr = 1;
+        int FLANK = 20;
+        for(String geneId: geneMap.keySet()) { // Iterate over the genes in the given geneMap
+
+            for(Transcript curTS : geneMap.get(geneId)) { // Iterate over the transcripts for this gene
+
+                // Get out all variant calls from the VCF file that overlap with this transcript
+                CloseableIterator<VariantContext> it = vcfr.query(
+                        curTS.getTrimmedChrom(),
+                        (curTS.get_ts_Start() - FLANK),
+                        (curTS.get_ts_End() + FLANK));
+
+                while(it.hasNext()) {
+                    VariantContext vc = it.next();
+                    String chr = vc.getContig();
+                    int pos = vc.getStart();
+                    double svmProb = Double.NaN;
+
+                    if (vc.getID().equalsIgnoreCase("SVM_PROBABILITY"))
+                        svmProb = Double.parseDouble((String) vc.getAttribute("SVM_PROBABILITY"));
+
+                    String ref = vc.getReference().getDisplayString(); // get the reference Allele NT
+                    String alt = vc.getAltAlleleWithHighestAlleleCount().getDisplayString(); // get the alternative Allele NT
+
+                    VariantInfo VI = new VariantInfo(chr, pos, ref, alt);
+                    VI.setSvmProb(svmProb);
+                    VI.add(vc);
+
+
+                    // Iterate over the features in 'featureSet'
+                    // Record all of these features for the current 'VI' object
+                    for (String s : globalFunctions.featureSet) {
+                        if (!VI.fetchFeature(s, vc, curTS.getTranscriptID())) {
+                            System.err.println("\nERROR with variant: " + VI.getID() + ":\nTrying to get " + s + "\n");
+                            System.exit(1);
+                        }
+                    }
+
+                    if(VI.getID().equalsIgnoreCase("1:179521754")) {
+                        int debug = 1;
+                    }
+
+                    if (VI.passesFilter(filter)) { // keep this variant because it met all of our filtering criteria.
+
+                        if (VI.hasCandidateSubjects(filterType)) {
+                            VI.printSummaryString(geneId, curTS.getTranscriptID());
+                        }
                     }
                 }
             }

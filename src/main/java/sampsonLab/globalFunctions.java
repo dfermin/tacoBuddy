@@ -5,6 +5,7 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
 
 import java.io.*;
+import java.sql.SQLException;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
 
@@ -21,6 +22,7 @@ public class globalFunctions {
     static public File srcGFF3 = null;
     static public String filterDOM = null;
     static public String filterREC = null;
+    static public String queryMode = null;
     static public Set<String> genesDOM = null;
     static public Set<String> genesREC = null;
     static public SortedSet<String> featureSet = null;
@@ -30,7 +32,7 @@ public class globalFunctions {
 
 
 
-    static public void parseCommandLineArgs(String[] args) throws IOException {
+    static public void parseCommandLineArgs(String[] args) throws IOException, SQLException {
         File paramF = null;
 
         if( args[0].equalsIgnoreCase("-t") ) {
@@ -47,6 +49,16 @@ public class globalFunctions {
             else {
                 parseParamFile(paramF);
             }
+        }
+
+        if(args[0].equalsIgnoreCase("-L")) {
+            String vcf = args[1];
+            String tbi = vcf + ".tbi";
+            inputVCF = new File(vcf);
+            inputVCF_tabix = new File(tbi);
+            VCFParser vcfp = new VCFParser(inputVCF, inputVCF_tabix);
+            vcfp.getINFOfields();
+            System.exit(0);
         }
     }
 
@@ -75,6 +87,10 @@ public class globalFunctions {
                 String gff3 = line.substring(8);
                 srcGFF3 = new File(gff3);
                 continue;
+            }
+
+            if(line.startsWith("queryMode=")) {
+                queryMode = line.substring(10);
             }
 
             if(line.startsWith("genesDOM=")) {
@@ -118,19 +134,19 @@ public class globalFunctions {
 
         // If you go this far you had an acceptable input file. Report all copied values to STDERR
         System.err.print("\n-------------------------------------------------------------\n");
-        if( !(null == inputVCF) ) System.err.print("inputVCF:     " + inputVCF.getCanonicalPath() + "\n");
-        if( !(null == srcGFF3) ) System.err.print("source GFF:   " + srcGFF3.getCanonicalPath() + "\n");
+        System.err.print("inputVCF:     " + inputVCF.getCanonicalPath() + "\n");
+        System.err.print("source GFF:   " + srcGFF3.getCanonicalPath() + "\n");
+        System.err.print("Query mode:   " + queryMode + "\n");
         if( genesDOM.size() > 0 ) System.err.print("DOM genes:    " + genesDOM + "\n");
         if( genesREC.size() > 0 ) System.err.print("REC genes:    " + genesREC + "\n");
-        if( filterDOM != null ) System.err.print("DOM filters:  " + filterDOM + "\n");
-        if( filterREC != null ) System.err.print("REC filters:  " + filterREC + "\n");
+        if( filterDOM != null )   System.err.print("DOM filters:  " + filterDOM + "\n");
+        if( filterREC != null )   System.err.print("REC filters:  " + filterREC + "\n");
         System.err.print("Selected output features: " + Joiner.on(", ").join(featureSet) + "\n");
 
         if( !(null == allowedSitesMap) && (allowedSitesMap.size() > 0) ) {
             System.err.print("Requested sites:\n");
             for(String k : allowedSitesMap.keySet()) { System.err.println("  " + allowedSitesMap.get(k) + "\t" + k); }
         }
-        //if( tsOutputModel.length() > 0 ) System.err.print("Output:       " + tsOutputModel + "\n");
         System.err.print("-------------------------------------------------------------\n\n");
     }
 
@@ -157,6 +173,18 @@ public class globalFunctions {
             System.err.println("\nERROR! Unable to find '" + srcGFF3.getName() + "'\n");
             System.exit(0);
         }
+
+        if( null == queryMode ) {
+            System.err.println("\nERROR! queryMode is not set. Must be either 'exon' or 'transcript'\n");
+            System.exit(0);
+        }
+
+        if( !queryMode.equalsIgnoreCase("transcript") &&
+            !queryMode.equalsIgnoreCase("exon")) {
+            System.err.println("\nERROR! queryMode must be either 'exon' or 'transcript'\n");
+            System.exit(0);
+        }
+
 
         score = 0;
         if( genesDOM.size() > 0 ) score++;
@@ -236,6 +264,10 @@ public class globalFunctions {
         bw.write("\n# This is the path to the gene coordinate file to use. Must be in GFF3 format.\nsrcGFF3=\n");
         bw.write("\n# List of DOMINANT genes to report results for\ngenesDOM=\n");
         bw.write("\n# List of RECESSIVE genes to report results for\ngenesREC=\n");
+        bw.write("\n# Specify query method for reporting variant calls.\n" +
+                      "\n# 'transcript' = look for variants within the boundaries of a transcript\n" +
+                      "\n# 'exon' = look for variants within the coding boundaries of exons\n" +
+                      "queryMode=transcript\n");
         bw.write("\n# List the variant information (ie: features) in the VCF file you want to report in the final output.\n" +
                         "# NOTE: This list _MUST_ contain all of the field names you use in 'filterDOM' and filterREC' below.\n" +
                         "# The entries here can be separated by tabs, spaces, commas or semicolons\n" +
