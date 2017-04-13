@@ -17,6 +17,7 @@ public class VariantInfo {
     public String REF;
     public String ALT;
     public String snp_id;
+    public String dbsnp_id;
     public int allowedSite; // -1 = not allowed, 0 = DOM, 1 = REC
     public boolean passedFilter;
 
@@ -35,11 +36,12 @@ public class VariantInfo {
 
 
 
-    public VariantInfo(String chr, int pos, String ref, String alt) {
+    public VariantInfo(String chr, int pos, String dbID, String ref, String alt) {
         this.chr = chr;
         this.pos = pos;
         this.REF = ref;
         this.ALT = alt;
+        this.dbsnp_id = dbID;
         this.svmProb = 0.0;
         this.passedFilter = false;
         this.sample_MAF = -1.0;
@@ -161,8 +163,11 @@ public class VariantInfo {
             passedFilter = true;
             retVal = true;
         }
+        else if(this.userFeatures.containsKey("EFF")) {
+            // Simple filter to remove synonymous mutations which have no impact on the phenotype
+            if(EFF.isSynonymousVariant()) retVal = false;
+        }
         else {
-
             JexlEngine jexl = new JexlBuilder().cache(512).strict(true).silent(false).create(); // Create a jexl engine
             JexlExpression expr = jexl.createExpression(jexl_filter_str); // define the expression you want to test/use
 
@@ -229,8 +234,10 @@ public class VariantInfo {
             ary.add(geneId);
             ary.add(this.chr);
             ary.add(String.valueOf(this.pos));
+            ary.add(this.dbsnp_id);
             ary.add(this.REF);
             ary.add(this.ALT);
+            ary.add(gf.getReadCount()); // read depth
 
             for(String feat : globalFunctions.featureSet) {
                 if(this.userFeatures.containsKey(feat)) {

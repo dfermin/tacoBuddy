@@ -1,12 +1,18 @@
 package sampsonLab;
 
 import com.google.common.base.Joiner;
+import com.google.common.base.Predicates;
 import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.SetMultimap;
+import com.sun.org.apache.xalan.internal.xsltc.DOM;
+import org.omg.IOP.TransactionService;
 
+import javax.swing.tree.TreeNode;
 import java.io.*;
 import java.sql.SQLException;
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 
 
@@ -20,9 +26,11 @@ public class globalFunctions {
     static public File inputVCF = null;
     static public File inputVCF_tabix = null;
     static public File srcGFF3 = null;
+    static public File TIMSfile = null;
     static public String filterDOM = null;
     static public String filterREC = null;
     static public String queryMode = null;
+    static public String outputTranscript = null;
     static public Set<String> genesDOM = null;
     static public Set<String> genesREC = null;
     static public SortedSet<String> featureSet = null;
@@ -104,6 +112,13 @@ public class globalFunctions {
                 for(String s: tmp) genesREC.add(s.replaceAll("\\s*", ""));
             }
 
+            if(line.startsWith("transcriptModel=")) {
+                outputTranscript=line.substring(16);
+            }
+            if(line.startsWith("TIMS=")) {
+                TIMSfile = new File(line.substring(5));
+            }
+
             if(line.startsWith("featureList=")) {
                 featureSet = new TreeSet<String>();
                 for(String s : line.substring(12).split("[,;\\s]+")) {
@@ -134,9 +149,13 @@ public class globalFunctions {
 
         // If you go this far you had an acceptable input file. Report all copied values to STDERR
         System.err.print("\n-------------------------------------------------------------\n");
-        System.err.print("inputVCF:     " + inputVCF.getCanonicalPath() + "\n");
-        System.err.print("source GFF:   " + srcGFF3.getCanonicalPath() + "\n");
-        System.err.print("Query mode:   " + queryMode + "\n");
+        System.err.print("inputVCF:         " + inputVCF.getCanonicalPath() + "\n");
+        System.err.print("source GFF:       " + srcGFF3.getCanonicalPath() + "\n");
+        System.err.print("Query mode:       " + queryMode + "\n");
+
+        System.err.print("Transcript model: " + outputTranscript + "\n");
+        if( outputTranscript.equalsIgnoreCase("mostConserved") ) System.err.print("TIMS file:    " + TIMSfile.getName() + "\n");
+
         if( genesDOM.size() > 0 ) System.err.print("DOM genes:    " + genesDOM + "\n");
         if( genesREC.size() > 0 ) System.err.print("REC genes:    " + genesREC + "\n");
         if( filterDOM != null )   System.err.print("DOM filters:  " + filterDOM + "\n");
@@ -171,6 +190,12 @@ public class globalFunctions {
 
         if( !srcGFF3.exists() ) {
             System.err.println("\nERROR! Unable to find '" + srcGFF3.getName() + "'\n");
+            System.exit(0);
+        }
+
+        if( outputTranscript.equalsIgnoreCase("mostConserved") &&
+                ( (null == TIMSfile) || !TIMSfile.exists() ) ) {
+            System.err.println("\nERROR! You asked for the 'mostConserved' transript model output but I can't find the TIMS file\n");
             System.exit(0);
         }
 
@@ -271,13 +296,19 @@ public class globalFunctions {
         bw.write("\n# List the variant information (ie: features) in the VCF file you want to report in the final output.\n" +
                         "# NOTE: This list _MUST_ contain all of the field names you use in 'filterDOM' and filterREC' below.\n" +
                         "# The entries here can be separated by tabs, spaces, commas or semicolons\n" +
-                        "featureList=GENEINFO\n");
+                        "featureList=GENEINFO EFF\n");
         bw.write("\n# Enter regex-like filters there for genes. For 'or' conditions surround the whole regex in forward slashes. Example: /['DT'] =~ SIFT/\n");
         bw.write("\n# Score filters to apply to the variants in DOMINANT genes\nfilterDOM=\n");
         bw.write("\n# Score filters to apply to the variants in RECESSIVE genes\nfilterREC=\n");
         bw.write("\n# Include data for these variants regardless of their filter scores\n" +
                 "# Variant syntax: chromosome:position\n" +
                 "# Multiple sites can be given as comma separated.\n#allowedSitesDOM=\n#allowedSitesREC=\n");
+        bw.write("\n# Specify which transcript model you want as output. The options are: all, longest, or mostConserved" +
+                "\n# mostConserved is defined by the TIMs score available at this site: http://glom.sph.umich.edu/GIMS" +
+                "\n# If you go with the mostConserved option, you *MUST* also provide the TIMS score file from the above website." +
+                "\n# The 'all' option will return ALL transcripts associated with the gene. This option is more for debugging." +
+                "\ntranscriptModel=longest\n");
+        bw.write("\n# You only need to provide this file if you chose 'mostConserved' for the 'transcriptModel' option\n# TIMS=\n");
         bw.write("\n");
         bw.close();
 
@@ -314,6 +345,7 @@ public class globalFunctions {
             String[] data = line.split("\t");
             if(data[2].equalsIgnoreCase("gene")) {
 
+
                 chr = data[0];
                 geneStart = Integer.parseInt(data[3]);
                 geneEnd = Integer.parseInt(data[4]);
@@ -322,7 +354,7 @@ public class globalFunctions {
 
                 String info[] = data[8].split(";");
                 for (String s : info) {
-                    if (s.startsWith("ID=")) geneID = s.substring(3);
+                    if (s.startsWith("ID=")) geneID = s.substring(3).replaceAll("\\..+$", "");  // remove version number from ENSG id
                     if (s.startsWith("gene_type=")) geneType = s.substring(10);
                     if (s.startsWith("gene_name=")) geneName = s.substring(10);
                 }
@@ -333,10 +365,10 @@ public class globalFunctions {
                 // Check to see if curTranscript is null, if it isn't you need to store this variable
                 // before you can continue;
                 if(curTranscript != null) {
-                    if(genesDOM.contains(geneName)) { DOM_geneMap.put(geneName, curTranscript); }
-                    else if(genesREC.contains(geneName)) { REC_geneMap.put(geneName, curTranscript); }
-                    curTranscript = null;
+                    if(genesDOM.contains(curTranscript.getGeneName())) DOM_geneMap.put(curTranscript.getGeneName(), curTranscript);
+                    else if(genesREC.contains(curTranscript.getGeneName())) REC_geneMap.put(curTranscript.getGeneName(), curTranscript);
                 }
+                curTranscript = null;
 
                 int start = Integer.parseInt(data[3]);
                 int end = Integer.parseInt(data[4]);
@@ -345,7 +377,7 @@ public class globalFunctions {
 
                 String info[] = data[8].split(";");
                 for (String s : info) {
-                    if (s.startsWith("ID=")) transID = s.substring(3);
+                    if (s.startsWith("ID=")) transID = s.substring(3).replaceAll("\\..+$", ""); // remove version number from ENST id
                     if (s.startsWith("gene_name=")) localGeneName = s.substring(10);
                 }
 
@@ -358,7 +390,7 @@ public class globalFunctions {
                 // Create a new transcript entry
                 curTranscript = new Transcript(chr,
                         geneStart, geneEnd,
-                        strand, geneID, geneType, geneName,
+                        strand, geneID, geneType, localGeneName,
                         start, end, transID);
             }
 
@@ -371,8 +403,8 @@ public class globalFunctions {
                 int exonNum = 0;
                 String info[] = data[8].split(";");
                 for (String s : info) {
-                    if (s.startsWith("Parent=")) transID = s.substring(7);
-                    if (s.startsWith("exon_id=")) exonID = s.substring(8);
+                    if (s.startsWith("Parent=")) transID = s.substring(7).replaceAll("\\..+$", "");
+                    if (s.startsWith("exon_id=")) exonID = s.substring(8).replaceAll("\\..+$", "");
                     if (s.startsWith("exon_number=")) exonNum = Integer.parseInt(s.substring(12));
                 }
 
@@ -390,7 +422,6 @@ public class globalFunctions {
 
                 curTranscript.addExon(E);
                 E = null;
-
             }
         }
         br.close();
@@ -399,4 +430,172 @@ public class globalFunctions {
                 "DOM gene map size: " + DOM_geneMap.asMap().size() +
                 "\nREC gene map size: " + REC_geneMap.asMap().size() + "\n");
     }
+
+
+    /*-----------------------------------------------------------------------------------------------------------------
+    ** Function chooses which transcripts to report in the final output based upon the outputTranscript variable
+     */
+    public void selectTranscriptModel() throws IOException {
+
+        HashMap<String, Transcript> gene2transMap = null;
+        Transcript best_TS = null;
+
+        if(this.outputTranscript.equalsIgnoreCase("all")) return; // don't filter transcript
+
+        if(this.outputTranscript.equalsIgnoreCase("mostConserved")) {
+            this.parseTIMS();
+
+            double lowest_tims;
+            gene2transMap = new HashMap<String, Transcript>();
+
+            // Iterate over all the genes in DOM_geneMap
+            // Keep the transcript with the *LOWEST* tims score
+            for(String gene : DOM_geneMap.keys()) {
+                lowest_tims = 10000;
+                best_TS = null;
+
+                for(Transcript ts: DOM_geneMap.get(gene)) {
+                    if (ts.getTims() < lowest_tims) {
+                        lowest_tims = ts.getTims();
+                        best_TS = ts;
+                    }
+                }
+
+                if(lowest_tims < 10000) { // we found at least 1 transcript with a low TIMS score
+                    gene2transMap.put(gene, best_TS);
+                }
+                else { // all of the transcripts have the same TIMS score so keep the longest transcript
+                    int tsLen = 0;
+                    best_TS = null;
+                    for(Transcript k: DOM_geneMap.get(gene) ) {
+                        if(k.getTsLen() > tsLen) {
+                            tsLen = k.getTsLen();
+                            best_TS = k;
+                        }
+                    }
+                    gene2transMap.put(gene, best_TS);
+                }
+            }
+            DOM_geneMap.clear();
+            for(String k : gene2transMap.keySet()) DOM_geneMap.put(k, gene2transMap.get(k));
+            gene2transMap.clear();
+
+
+            // Iterate over all the genes in REC_geneMap
+            // Keep the transcript with the *LOWEST* tims score
+            for(String gene : REC_geneMap.keys()) {
+                lowest_tims = 10000;
+                best_TS = null;
+
+                for(Transcript ts: REC_geneMap.get(gene)) {
+                    if (ts.getTims() < lowest_tims) {
+                        lowest_tims = ts.getTims();
+                        best_TS = ts;
+                    }
+                }
+
+                if(lowest_tims < 10000) {
+                    gene2transMap.put(gene, best_TS);
+                }
+                else { // all of the transcripts have the same TIMS score so keep the longest transcript
+                    int tsLen = 0;
+                    best_TS = null;
+                    for(Transcript k: REC_geneMap.get(gene) ) {
+                        if(k.getTsLen() > tsLen) {
+                            tsLen = k.getTsLen();
+                            best_TS = k;
+                        }
+                    }
+                    gene2transMap.put(gene, best_TS);
+                }
+            }
+            REC_geneMap.clear();
+            for(String k : gene2transMap.keySet()) REC_geneMap.put(k, gene2transMap.get(k));
+            gene2transMap.clear();
+
+        } //-------------- End if over outputTranscript == mostConserved ------------------------
+
+
+        if(outputTranscript.equalsIgnoreCase("longest")) {
+            int tsLen = 0;
+            best_TS = null;
+
+            gene2transMap = new HashMap<String, Transcript>();
+
+            for(String gene : DOM_geneMap.keys()) {
+                tsLen = 0;
+                best_TS = null;
+                for(Transcript ts : DOM_geneMap.get(gene)) {
+                    if(ts.getTsLen() > tsLen) {
+                        tsLen = ts.getTsLen();
+                        best_TS = ts;
+                    }
+                }
+                gene2transMap.put(gene, best_TS);
+            }
+            DOM_geneMap.clear();
+            for(String k : gene2transMap.keySet()) DOM_geneMap.put(k, gene2transMap.get(k));
+            gene2transMap.clear();
+
+
+            for(String gene : REC_geneMap.keys()) {
+                tsLen = 0;
+                best_TS = null;
+                for(Transcript ts : REC_geneMap.get(gene)) {
+                    if(ts.getTsLen() > tsLen) {
+                        tsLen = ts.getTsLen();
+                        best_TS = ts;
+                    }
+                }
+                gene2transMap.put(gene, best_TS);
+            }
+            REC_geneMap.clear();
+            for(String k : gene2transMap.keySet()) REC_geneMap.put(k, gene2transMap.get(k));
+            gene2transMap.clear();
+        }
+    }
+
+    /*------------------------------------------------------------------------------------------------------------------
+    ** Function parses the TIM file aquried from http://glom.sph.umich.edu/GIMS/
+     */
+    public void parseTIMS() throws IOException {
+
+        System.err.println("Parsing " + this.TIMSfile.getName());
+
+        FileReader fr = new FileReader(this.TIMSfile);
+        BufferedReader br = new BufferedReader(fr);
+        String line = null, geneID = null, transID = null;
+        double tims = -1;
+
+        while((line = br.readLine()) != null) {
+            if(line.startsWith("GENCODE")) continue;
+
+            String lineData[] = line.split("\\s+");
+            geneID = lineData[1]; // gene Symbol
+            transID = lineData[2].replaceAll("\\..+$", "");
+            tims = Double.valueOf( lineData[3] );
+
+            if( (null != DOM_geneMap) && (DOM_geneMap.containsKey(geneID)) ) {
+                for(Transcript ts : DOM_geneMap.get(geneID)) {
+                    if(ts.getTranscriptID().equalsIgnoreCase(transID)) {
+                        ts.setTIMS(tims);
+                        DOM_geneMap.put(geneID, ts);
+                    }
+                }
+            }
+
+
+            if( (null != REC_geneMap) && (REC_geneMap.containsKey(geneID)) ) {
+                for(Transcript ts : REC_geneMap.get(geneID)) {
+                    if(ts.getTranscriptID().equalsIgnoreCase(transID)) {
+                        ts.setTIMS(tims);
+                        REC_geneMap.put(geneID, ts);
+                    }
+                }
+            }
+
+        }
+        br.close();
+    }
+
 }

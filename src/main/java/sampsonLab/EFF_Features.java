@@ -1,6 +1,8 @@
 package sampsonLab;
 
 import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableMap;
+import jdk.nashorn.internal.ir.annotations.Immutable;
 
 import java.util.*;
 
@@ -10,11 +12,37 @@ import java.util.*;
 public class EFF_Features extends FeatureClass {
 
     public HashMap<String, String> eff; // k = transcript ID, v = status_for_this_transcript
+    public HashMap<String, String> protChange; // k = transcript ID, v amino acid change (if any)
+
+    static final Map<String, String> aaMap = ImmutableMap.<String, String>builder()
+            .put("Ala", "A")
+            .put("Arg", "R")
+            .put("Asn", "N")
+            .put("Asp", "D")
+            .put("Cys", "C")
+            .put("Gln", "Q")
+            .put("Glu", "E")
+            .put("Gly", "G")
+            .put("His", "H")
+            .put("Ile", "I")
+            .put("Leu", "L")
+            .put("Lys", "K")
+            .put("Met", "M")
+            .put("Phe", "F")
+            .put("Pro", "P")
+            .put("Ser", "S")
+            .put("Thr", "T")
+            .put("Trp", "W")
+            .put("Tyr", "Y")
+            .put("Val", "V")
+            .build();
 
     public EFF_Features(String ss) {
 
         eff = new HashMap<String, String>();
+        protChange = new HashMap<String, String>();
 
+        // this array will contain 1 entry per transcript affected by the variant call
         String[] inputAry = ss.replaceAll("[\\[\\]]+", "").split(",");
 
         for(String s : inputAry) {
@@ -22,26 +50,61 @@ public class EFF_Features extends FeatureClass {
             String[] tmpAry = s.split("\\|");
 
             String label = tmpAry[0].substring(0,tmpAry[0].indexOf('(')).trim(); // gets the "assigned effect" of this variant on the given gene.
+
+
             String transId = "";
+            String protAA = "#NULL";
             for(int j = 1; j < tmpAry.length; j++) {
                 if( tmpAry[j].startsWith("ENST00") ) {
                     transId = tmpAry[j];
-                    break;
+                }
+                if( tmpAry[j].startsWith("p.")) { // amino acid level change information
+                    protAA = parseProteinChange(tmpAry[j]);
                 }
             }
-            if(transId.startsWith("ENST00")) eff.put(transId, label);
+            if(transId.startsWith("ENST00")) {
+                eff.put(transId, label);
+                protChange.put(transId, protAA);
+            }
         }
     }
 
+
+    // Function returns a string indicating the change the variant causes at the protein level
+    private String parseProteinChange(String ss) {
+        String ret = ss.split("/")[0].substring(2);
+
+        for(String aa3 : this.aaMap.keySet()) {
+            if(ret.contains(aa3)) {
+                String x1 = ret.replaceAll(aa3, this.aaMap.get(aa3));
+                ret = x1;
+            }
+        }
+        return ret;
+    }
+
+
+    // Function returns TRUE if the data in EFF_Features says this variant has no affect on the phenotype
+    public boolean isSynonymousVariant() {
+        boolean ret = true;
+
+        int score = 0;
+        for(String ef : eff.values()) {
+            if( !ef.equalsIgnoreCase("synonymous_variant") ) score++;
+        }
+        if(score > 0) ret = false;
+        return(ret);
+    }
 
 
     // Function returns the value of 'eff' map for the given key 'k'.
     // If no match is found, null is returned
     public String findTS(String search_str) {
-        String ret = "no_match";
+        String ret = ".";
 
         if(eff.containsKey(search_str.replaceAll("\\.\\d+$", ""))) {
             ret = eff.get(search_str);
+            ret += ":" + protChange.get(search_str);
         }
         return ret;
     }

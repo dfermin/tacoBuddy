@@ -39,12 +39,13 @@ public class tacoBuddy {
 
         globals.parseCommandLineArgs(args);
         globals.parseGFF3();
+        globals.selectTranscriptModel();
 
         the_vcf_parser = new VCFParser(globals.inputVCF, globals.inputVCF_tabix);
 
 
         // Print header line
-        String hdr = "#SAMPLE\tGenotype\tTranscriptID\tGene_Name\tchrom\tpos\tREF\tALT\t";
+        String hdr = "#SAMPLE\tGenotype\tTranscriptID\tGene_Name\tchrom\tpos\tdbsnpID\tREF\tALT\treadCounts\t";
         hdr += Joiner.on("\t").join(globalFunctions.featureSet);
         System.out.println(hdr);
 

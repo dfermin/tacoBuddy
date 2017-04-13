@@ -13,7 +13,8 @@ public class Genotype_Feature extends FeatureClass {
     public String genotype_DNA_str; // genotype represented as nucleotides, example: G/A or T|T
     public String genotype_INT_str; // genotype represented as numbers, example: 0/1, 1/1, 0/0, 1/0
     public int genotypeInt; // 0 = homologous dominant, 1 = heterozygous, 2 = homologous recessive
-    public int DP, GQ;
+    public int GQ;
+    public int totReadDepth, refReadDepth, altReadDepth;
     public String genotype_word; // HOM, HET or HOM_ALT
 
     public Genotype_Feature(String id, Genotype G) {
@@ -21,9 +22,11 @@ public class Genotype_Feature extends FeatureClass {
         this.genotype_DNA_str = "";
         this.genotype_INT_str = "";
         this.genotypeInt = -1;
-        this.DP = -1;
         this.GQ = -1;
         this.genotype_word = "#NULL";
+        this.totReadDepth = 0;
+        this.refReadDepth = 0;
+        this.altReadDepth = 0;
 
         if(G.isCalled()) {
             this.genotype_DNA_str = G.getGenotypeString();
@@ -41,8 +44,13 @@ public class Genotype_Feature extends FeatureClass {
                 this.genotypeInt = 2;
             }
 
-            if (G.hasAD()) this.DP = G.getDP();
             if (G.hasGQ()) this.GQ = G.getGQ();
+
+            if (G.hasAD()) {
+                this.refReadDepth = G.getAD()[0];
+                this.altReadDepth = G.getAD()[1];
+                this.totReadDepth = this.refReadDepth + this.altReadDepth;
+            }
 
             for (Allele a : G.getAlleles()) {
                 this.genotype_INT_str += (a.isReference() ? "1" : "0") + "|";
@@ -53,6 +61,17 @@ public class Genotype_Feature extends FeatureClass {
             this.genotype_DNA_str = ".";
             this.genotype_INT_str = ".";
         }
+    }
+
+    /*----------------------------------------------------------------------------------------------
+    ** Function returns the read depth information for this genotype feature
+     */
+    public String getReadCount() {
+        String ret = "";
+        ret = "T=" + Integer.toString(this.totReadDepth) + "/" +
+              "r=" + Integer.toString(this.refReadDepth) + "/" +
+              "a=" + Integer.toString(this.altReadDepth);
+        return(ret);
     }
 
     /**********************************************************************************************/

@@ -11,7 +11,9 @@ public class Transcript {
     private int geneEnd;
     private int startPos;
     private int endPos;
+    private int tsLen;
     private char strand;
+    private double tims;
 
     // These are features from the last column of the GFF3 file.
     // At the time this code was written, were using the field names used by gencode v25, 2016-07-18
@@ -39,6 +41,12 @@ public class Transcript {
         endPos = tsE;
         transcriptID = tsID;
 
+        tims = 10000;
+
+        // this ifelse handles transcripts on both strands
+        if(endPos > startPos) tsLen = endPos - startPos + 1;
+        else tsLen = startPos - endPos + 1;
+
         exonsSet = new HashSet<Exon>();
     }
 
@@ -51,6 +59,8 @@ public class Transcript {
     public int get_gene_Start() { return geneStart; }
     public int get_gene_End() { return geneEnd; }
     public int getNumExons() { return exonsSet.size(); }
+    public int getTsLen() { return tsLen; }
+    public double getTims() { return tims; }
     public void addExon(sampsonLab.Exon e) { exonsSet.add(e); }
 
     public HashSet<sampsonLab.Exon> getAllExons() { return exonsSet; }
@@ -73,5 +83,9 @@ public class Transcript {
         if( this.transcriptID.equalsIgnoreCase(Other.getTranscriptID()) ) ret = true;
 
         return ret;
+    }
+
+    public void setTIMS(double TIMS) {
+        this.tims = TIMS;
     }
 }

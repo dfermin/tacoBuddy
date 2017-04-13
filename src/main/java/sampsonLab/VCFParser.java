@@ -90,8 +90,8 @@ public class VCFParser {
 
                         String ref = vc.getReference().getDisplayString(); // get the reference Allele NT
                         String alt = vc.getAltAlleleWithHighestAlleleCount().getDisplayString(); // get the alternative Allele NT
-
-                        VariantInfo VI = new VariantInfo(chr, pos, ref, alt);
+                        String dbsnp_id = vc.getID();
+                        VariantInfo VI = new VariantInfo(chr, pos, dbsnp_id, ref, alt);
                         VI.setSvmProb(svmProb);
                         VI.add(vc);
 
@@ -150,8 +150,9 @@ public class VCFParser {
 
                     String ref = vc.getReference().getDisplayString(); // get the reference Allele NT
                     String alt = vc.getAltAlleleWithHighestAlleleCount().getDisplayString(); // get the alternative Allele NT
+                    String dbsnp_id = vc.getID();
 
-                    VariantInfo VI = new VariantInfo(chr, pos, ref, alt);
+                    VariantInfo VI = new VariantInfo(chr, pos, dbsnp_id, ref, alt);
                     VI.setSvmProb(svmProb);
                     VI.add(vc);
 
