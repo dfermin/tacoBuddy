@@ -105,8 +105,7 @@ public class VCFParser {
                             }
                         }
 
-                        if( VI.passesFilter(filter) ) { // keep this variant because it met all of our filtering criteria.
-
+                        if( VI.passesFilter(filter, curTS.getTranscriptID()) ) { // keep this variant because it met all of our filtering criteria.
                             if(VI.hasCandidateSubjects(filterType)) {
                                 VI.printSummaryString(geneId, curTS.getTranscriptID());
                             }
@@ -166,7 +165,7 @@ public class VCFParser {
                         }
                     }
 
-                    if (VI.passesFilter(filter)) { // keep this variant because it met all of our filtering criteria.
+                    if (VI.passesFilter(filter, curTS.getTranscriptID())) { // keep this variant because it met all of our filtering criteria.
                         if (VI.hasCandidateSubjects(filterType)) {
                             VI.printSummaryString(geneId, curTS.getTranscriptID());
                         }

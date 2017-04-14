@@ -365,6 +365,7 @@ public class globalFunctions {
                 // Check to see if curTranscript is null, if it isn't you need to store this variable
                 // before you can continue;
                 if(curTranscript != null) {
+                    curTranscript.calcCDSlength();
                     if(genesDOM.contains(curTranscript.getGeneName())) DOM_geneMap.put(curTranscript.getGeneName(), curTranscript);
                     else if(genesREC.contains(curTranscript.getGeneName())) REC_geneMap.put(curTranscript.getGeneName(), curTranscript);
                 }

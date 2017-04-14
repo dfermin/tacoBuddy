@@ -43,10 +43,6 @@ public class Transcript {
 
         tims = 10000;
 
-        // this ifelse handles transcripts on both strands
-        if(endPos > startPos) tsLen = endPos - startPos + 1;
-        else tsLen = startPos - endPos + 1;
-
         exonsSet = new HashSet<Exon>();
     }
 
@@ -70,7 +66,20 @@ public class Transcript {
         return(ret);
     }
 
+    public void setTIMS(double TIMS) {
+        this.tims = TIMS;
+    }
 
+    public void calcCDSlength() {
+        tsLen = 0;
+        for(Exon e : exonsSet) {
+            int diff = 0;
+            if(e.exonEnd < e.exonStart) diff = (e.exonStart - e.exonEnd + 1);
+            else diff = (e.exonEnd - e.exonStart + 1);
+
+            tsLen += diff;
+        }
+    }
 
 
     @Override
@@ -85,7 +94,5 @@ public class Transcript {
         return ret;
     }
 
-    public void setTIMS(double TIMS) {
-        this.tims = TIMS;
-    }
+
 }

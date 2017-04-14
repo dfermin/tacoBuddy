@@ -12,7 +12,8 @@ import java.util.*;
 public class EFF_Features extends FeatureClass {
 
     public HashMap<String, String> eff; // k = transcript ID, v = status_for_this_transcript
-    public HashMap<String, String> protChange; // k = transcript ID, v amino acid change (if any)
+    public HashMap<String, Integer> impactMap; // k = transcript ID, v = the impact of this variant (HIGH=3, MODERATE=2, LOW=1)
+    public HashMap<String, String> protChange; // k = transcript ID, v = amino acid change (if any)
 
     static final Map<String, String> aaMap = ImmutableMap.<String, String>builder()
             .put("Ala", "A")
@@ -41,6 +42,7 @@ public class EFF_Features extends FeatureClass {
 
         eff = new HashMap<String, String>();
         protChange = new HashMap<String, String>();
+        impactMap = new HashMap<String, Integer>();
 
         // this array will contain 1 entry per transcript affected by the variant call
         String[] inputAry = ss.replaceAll("[\\[\\]]+", "").split(",");
@@ -50,11 +52,18 @@ public class EFF_Features extends FeatureClass {
             String[] tmpAry = s.split("\\|");
 
             String label = tmpAry[0].substring(0,tmpAry[0].indexOf('(')).trim(); // gets the "assigned effect" of this variant on the given gene.
-
+            label = label.replaceAll("_variant", "");
 
             String transId = "";
             String protAA = "#NULL";
-            for(int j = 1; j < tmpAry.length; j++) {
+            String impactValue = "#NULL";
+            for(int j = 0; j < tmpAry.length; j++) {
+
+                if( j == 0 ) { //should be the impact of this variant according to http://snpeff.sourceforge.net/VCFannotationformat_v1.0.pdf
+                    impactValue = tmpAry[j].split("\\(")[1];
+                    continue;
+                }
+
                 if( tmpAry[j].startsWith("ENST00") ) {
                     transId = tmpAry[j];
                 }
@@ -62,9 +71,15 @@ public class EFF_Features extends FeatureClass {
                     protAA = parseProteinChange(tmpAry[j]);
                 }
             }
+
             if(transId.startsWith("ENST00")) {
                 eff.put(transId, label);
                 protChange.put(transId, protAA);
+
+                if(impactValue.equalsIgnoreCase("HIGH")) impactMap.put(transId, 3);
+                else if(impactValue.equalsIgnoreCase("MODERATE")) impactMap.put(transId, 2);
+                else if(impactValue.equalsIgnoreCase("LOW")) impactMap.put(transId, 1);
+                else impactMap.put(transId, 0);
             }
         }
     }
@@ -80,20 +95,54 @@ public class EFF_Features extends FeatureClass {
                 ret = x1;
             }
         }
+
+        if(ret.endsWith("fs")) { // frame shift
+            ret = "-" + ret.replaceAll("fs", "");
+        }
+
+        return ret;
+    }
+
+
+    // Function returns TRUE if the impact value for the given transcript matches the value passed to this function
+    public boolean checkEFFimpact(String curTS, String cutOff) {
+        boolean ret = false;
+
+        int cutOffNum = 0;
+        if(cutOff.equalsIgnoreCase("HIGH")) cutOffNum = 3;
+        if(cutOff.equalsIgnoreCase("MODERATE")) cutOffNum = 2;
+        if(cutOff.equalsIgnoreCase("LOW")) cutOffNum = 1;
+
+        if(impactMap.containsKey(curTS)){
+            if(impactMap.get(curTS) >= cutOffNum) ret = true;
+        }
+
         return ret;
     }
 
 
     // Function returns TRUE if the data in EFF_Features says this variant has no affect on the phenotype
-    public boolean isSynonymousVariant() {
+    public boolean isSynonymousVariant(String ts) {
         boolean ret = true;
 
-        int score = 0;
-        for(String ef : eff.values()) {
-            if( !ef.equalsIgnoreCase("synonymous_variant") ) score++;
+        if(eff.containsKey(ts)) {
+            if( !eff.get(ts).equalsIgnoreCase("synonymous") ) ret = false;
         }
-        if(score > 0) ret = false;
         return(ret);
+    }
+
+
+    // Function converts the impact numbers to string terms
+    private String impactNum2str(String ts) {
+        String ret = ".";
+
+        if(impactMap.containsKey(ts)) {
+            int I = impactMap.get(ts);
+            if(I == 1) ret = "LOW";
+            if(I == 2) ret = "MODERATE";
+            if(I == 3) ret = "HIGH";
+        }
+        return ret;
     }
 
 
@@ -104,7 +153,7 @@ public class EFF_Features extends FeatureClass {
 
         if(eff.containsKey(search_str.replaceAll("\\.\\d+$", ""))) {
             ret = eff.get(search_str);
-            ret += ":" + protChange.get(search_str);
+            ret += ":" + protChange.get(search_str) + ":" + impactNum2str(search_str);
         }
         return ret;
     }

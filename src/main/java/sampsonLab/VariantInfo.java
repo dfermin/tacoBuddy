@@ -154,18 +154,24 @@ public class VariantInfo {
     /*********************************************************************************************/
     // Function applies the user's filter to this variant. Calling this function assumes VariantInfo::fetchFeature()
     // ran successfully.
-    public boolean passesFilter(String jexl_filter_str) {
+    public boolean passesFilter(String jexl_filter_str, String curTS) {
 
         boolean retVal = false;
+
+        if(this.userFeatures.containsKey("EFF")) {
+
+            // Quick check to see if this is a synonymous mutation. If it is, automatically fail it
+            if(EFF.isSynonymousVariant(curTS)) return  false;
+
+            // Check to see if this is a high-impact mutation
+            // Keep any high-impact mutations that have a minor allele frequency < 5% in our VCF file
+            if(EFF.checkEFFimpact(curTS, "HIGH") && (this.sample_MAF < 0.05) ) return true;
+        }
 
         // check to see if this current variant is among the sites the user specified as 'allowedSites'
         if(this.allowedSite > -1) {
             passedFilter = true;
             retVal = true;
-        }
-        else if(this.userFeatures.containsKey("EFF")) {
-            // Simple filter to remove synonymous mutations which have no impact on the phenotype
-            if(EFF.isSynonymousVariant()) retVal = false;
         }
         else {
             JexlEngine jexl = new JexlBuilder().cache(512).strict(true).silent(false).create(); // Create a jexl engine
@@ -238,6 +244,7 @@ public class VariantInfo {
             ary.add(this.REF);
             ary.add(this.ALT);
             ary.add(gf.getReadCount()); // read depth
+            ary.add( dbl2str(this.sample_MAF, PRECISION, true) );
 
             for(String feat : globalFunctions.featureSet) {
                 if(this.userFeatures.containsKey(feat)) {
@@ -245,7 +252,8 @@ public class VariantInfo {
                     Object o = this.userFeatures.get(feat);
                     if (o.getClass().getSimpleName().equalsIgnoreCase("double")) {
                         double d = (Double) o;
-                        ary.add(dbl2str(d, PRECISION, false));
+                        if(d == 1000) ary.add(".");
+                        else ary.add(dbl2str(d, PRECISION, false));
                     } else {
                         String tmp = (String) this.userFeatures.get(feat);
                         ary.add( this.makeStringNR(tmp) );
