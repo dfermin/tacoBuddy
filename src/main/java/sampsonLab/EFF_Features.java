@@ -65,7 +65,7 @@ public class EFF_Features extends FeatureClass {
                 }
 
                 if( tmpAry[j].startsWith("ENST00") ) {
-                    transId = tmpAry[j];
+                    transId = tmpAry[j].replaceAll("\\.\\d+$", "");
                 }
                 if( tmpAry[j].startsWith("p.")) { // amino acid level change information
                     protAA = parseProteinChange(tmpAry[j]);

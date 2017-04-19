@@ -31,6 +31,7 @@ public class globalFunctions {
     static public String filterREC = null;
     static public String queryMode = null;
     static public String outputTranscript = null;
+    static public double required_min_sample_maf = 0.1;
     static public Set<String> genesDOM = null;
     static public Set<String> genesREC = null;
     static public SortedSet<String> featureSet = null;
@@ -97,6 +98,10 @@ public class globalFunctions {
                 continue;
             }
 
+            if(line.startsWith("min_sample_maf=")) {
+                required_min_sample_maf = Double.valueOf(line.substring(15));
+            }
+
             if(line.startsWith("queryMode=")) {
                 queryMode = line.substring(10);
             }
@@ -152,6 +157,7 @@ public class globalFunctions {
         System.err.print("inputVCF:         " + inputVCF.getCanonicalPath() + "\n");
         System.err.print("source GFF:       " + srcGFF3.getCanonicalPath() + "\n");
         System.err.print("Query mode:       " + queryMode + "\n");
+        System.err.print("Sample MAF:     < " + required_min_sample_maf + "\n");
 
         System.err.print("Transcript model: " + outputTranscript + "\n");
         if( outputTranscript.equalsIgnoreCase("mostConserved") ) System.err.print("TIMS file:    " + TIMSfile.getName() + "\n");
@@ -289,14 +295,15 @@ public class globalFunctions {
         bw.write("\n# This is the path to the gene coordinate file to use. Must be in GFF3 format.\nsrcGFF3=\n");
         bw.write("\n# List of DOMINANT genes to report results for\ngenesDOM=\n");
         bw.write("\n# List of RECESSIVE genes to report results for\ngenesREC=\n");
-        bw.write("\n# Specify query method for reporting variant calls.\n" +
-                      "\n# 'transcript' = look for variants within the boundaries of a transcript\n" +
-                      "\n# 'exon' = look for variants within the coding boundaries of exons\n" +
+        bw.write("\n# Specify the minimum Sample minor allele frequecy (MAF) that a variant call must have in order to be reported\nmin_sample_maf=0.05");
+        bw.write("\n# Specify query method for reporting variant calls." +
+                      "\n# 'transcript' = look for variants within the boundaries of a transcript" +
+                      "\n# 'exon' = look for variants within the coding boundaries of exons" +
                       "queryMode=transcript\n");
         bw.write("\n# List the variant information (ie: features) in the VCF file you want to report in the final output.\n" +
                         "# NOTE: This list _MUST_ contain all of the field names you use in 'filterDOM' and filterREC' below.\n" +
                         "# The entries here can be separated by tabs, spaces, commas or semicolons\n" +
-                        "featureList=GENEINFO EFF\n");
+                        "featureList=EFF\n");
         bw.write("\n# Enter regex-like filters there for genes. For 'or' conditions surround the whole regex in forward slashes. Example: /['DT'] =~ SIFT/\n");
         bw.write("\n# Score filters to apply to the variants in DOMINANT genes\nfilterDOM=\n");
         bw.write("\n# Score filters to apply to the variants in RECESSIVE genes\nfilterREC=\n");

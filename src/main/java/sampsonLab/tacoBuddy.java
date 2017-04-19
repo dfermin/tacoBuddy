@@ -7,7 +7,6 @@ package sampsonLab;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Map;
 
 import apple.laf.JRSUIConstants;
 import com.google.common.base.Joiner;
@@ -44,14 +43,15 @@ public class tacoBuddy {
         the_vcf_parser = new VCFParser(globals.inputVCF, globals.inputVCF_tabix);
 
         if(globals.featureSet.contains("EFF")) {
-            System.err.println("\nHard coded filters based on EFF info fields:\n" +
+            double x = globals.required_min_sample_maf * 100;
+            System.err.println("\nFilters based on EFF info fields:\n" +
                     "\t1. Synonymous SNPs excluded\n" +
-                    "\t2. HIGH impact variants with Sample_MAF < 5% will always be reported\n");
+                    "\t2. HIGH impact variants with Sample_MAF < " + x + "% will always be reported\n");
         }
 
         // Print header line
-        String hdr = "#SAMPLE\tGenotype\tTranscriptID\tGene_Name\tchrom\tpos\tdbsnpID\tREF\tALT\t" +
-                     "readCounts (Total/ref/alt)\tSAMPLE_MAF (as %)\t";
+        String hdr = "#SAMPLE\tGenotype\tmodel\tTranscriptID\tGene_Name\tchrom\tpos\tdbsnpID\tREF\tALT\t" +
+                     "ReadCounts (total)\tReadCounts (ref/alt)\tSAMPLE_MAF (as %)\t";
         hdr += Joiner.on("\t").join(globalFunctions.featureSet);
         System.out.println(hdr);
 

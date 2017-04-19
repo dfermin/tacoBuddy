@@ -68,7 +68,7 @@ public class Genotype_Feature extends FeatureClass {
      */
     public String getReadCount() {
         String ret = "";
-        ret = "T=" + Integer.toString(this.totReadDepth) + "/" +
+        ret = Integer.toString(this.totReadDepth) + "\t" +
               "r=" + Integer.toString(this.refReadDepth) + "/" +
               "a=" + Integer.toString(this.altReadDepth);
         return(ret);

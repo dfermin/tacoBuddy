@@ -20,6 +20,7 @@ public class VariantInfo {
     public String dbsnp_id;
     public int allowedSite; // -1 = not allowed, 0 = DOM, 1 = REC
     public boolean passedFilter;
+    public String modelType; // REC or DOM
 
     public double svmProb;
     public double sample_MAF; // minor allele frequency for the samples
@@ -36,12 +37,13 @@ public class VariantInfo {
 
 
 
-    public VariantInfo(String chr, int pos, String dbID, String ref, String alt) {
+    public VariantInfo(String chr, int pos, String dbID, String ref, String alt, String mt) {
         this.chr = chr;
         this.pos = pos;
         this.REF = ref;
         this.ALT = alt;
         this.dbsnp_id = dbID;
+        this.modelType = mt;
         this.svmProb = 0.0;
         this.passedFilter = false;
         this.sample_MAF = -1.0;
@@ -156,6 +158,11 @@ public class VariantInfo {
     // ran successfully.
     public boolean passesFilter(String jexl_filter_str, String curTS) {
 
+
+        if(pos == 179526214) {
+            int debug = 1;
+        }
+
         boolean retVal = false;
 
         if(this.userFeatures.containsKey("EFF")) {
@@ -164,8 +171,8 @@ public class VariantInfo {
             if(EFF.isSynonymousVariant(curTS)) return  false;
 
             // Check to see if this is a high-impact mutation
-            // Keep any high-impact mutations that have a minor allele frequency < 5% in our VCF file
-            if(EFF.checkEFFimpact(curTS, "HIGH") && (this.sample_MAF < 0.05) ) return true;
+            // Keep any high-impact mutations that have a minor allele frequency < req_min_sample_maf in our VCF file
+            if(EFF.checkEFFimpact(curTS, "HIGH") && (this.sample_MAF < globalFunctions.required_min_sample_maf) ) return true;
         }
 
         // check to see if this current variant is among the sites the user specified as 'allowedSites'
@@ -236,6 +243,7 @@ public class VariantInfo {
 
             ary.add(k);
             ary.add(gf.genotype_word);
+            ary.add(this.modelType);
             ary.add(transcriptID);
             ary.add(geneId);
             ary.add(this.chr);
