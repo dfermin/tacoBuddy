@@ -9,6 +9,7 @@ import java.io.File;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.TreeMap;
 
 
@@ -64,7 +65,6 @@ public class VCFParser {
         // This command only works if you have the tabix tbi file for the input VCF
         VCFFileReader vcfr = new VCFFileReader(inputVCF, inputVCF_tabix);
 
-        int ctr = 1;
         int FLANK = 2;
         for(String geneId: geneMap.keySet()) { // Iterate over the genes in the given geneMap
 

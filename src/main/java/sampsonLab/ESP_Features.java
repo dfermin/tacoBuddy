@@ -12,11 +12,12 @@ public class ESP_Features extends FeatureClass {
     public double ESP_AA_AC, ESP_EA_AC, ESP_MAF;
     public double ESP_MAX_AA_EA;
 
+    // In the context of this program, zero for AC or MAF implies that the variant was not observed in ESP
     public ESP_Features() {
-        ESP_AA_AC = 1000;
-        ESP_EA_AC = 1000;
-        ESP_MAF = 1000;
-        ESP_MAX_AA_EA = 1000;
+        ESP_AA_AC = 0;
+        ESP_EA_AC = 0;
+        ESP_MAF = 0;
+        ESP_MAX_AA_EA = 0;
     }
 
 
@@ -31,7 +32,7 @@ public class ESP_Features extends FeatureClass {
         // For 'ESP6500SI-V2-SSA137.GRCh38-liftover' vcf file which we are using,
         // the syntax for ESP Allele Count is in the order of AltAlleles,RefAllele.
 
-        if(AC_str.equalsIgnoreCase(".")) return 1000.0;
+        if(AC_str.equalsIgnoreCase(".")) return 0;
 
         // record all of the allele counts
         for(String s : AC_str.split(",")) {

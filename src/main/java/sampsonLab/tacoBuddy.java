@@ -65,8 +65,6 @@ public class tacoBuddy {
             if (globals.DOM_geneMap.size() > 0) the_vcf_parser.parseByTranscript(globals.DOM_geneMap, globals.filterDOM, "DOM");
             if (globals.REC_geneMap.size() > 0) the_vcf_parser.parseByTranscript(globals.REC_geneMap, globals.filterREC, "REC");
         }
-
-
     }
 
 }

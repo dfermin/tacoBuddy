@@ -262,8 +262,10 @@ public class globalFunctions {
                 String key = s;
                 s = s.trim().replaceAll("\\[", "").replaceAll("\\]", "").replaceAll("'", ""); // strip out []'
                 int i = s.indexOf("=~");
+
                 String comparison_suffix = s.substring(i).trim();
                 String pattern = s.substring(0,i).trim();
+
                 ArrayList<String> Jarray = new ArrayList<String>();
                 for(String k : pattern.split("")) {
                     tmp = "('" + k + "' " + comparison_suffix + ")";
@@ -304,9 +306,13 @@ public class globalFunctions {
                         "# NOTE: This list _MUST_ contain all of the field names you use in 'filterDOM' and filterREC' below.\n" +
                         "# The entries here can be separated by tabs, spaces, commas or semicolons\n" +
                         "featureList=EFF\n");
-        bw.write("\n# Enter regex-like filters there for genes. For 'or' conditions surround the whole regex in forward slashes. Example: /['DT'] =~ SIFT/\n");
-        bw.write("\n# Score filters to apply to the variants in DOMINANT genes\nfilterDOM=\n");
-        bw.write("\n# Score filters to apply to the variants in RECESSIVE genes\nfilterREC=\n");
+        bw.write("\n# Enter regex-like filters there for genes. " +
+                      "\n# The syntax is **CRITICAL** here. You must write your text-based expressions as: 'query_term' =~ 'filter_field' " +
+                      "\n# For 'or' conditions surround the whole regex in forward slashes. Example: /['DT'] =~ SIFT/" +
+                      "\n# Numerical filters are written as 'filter_field' <= 'numeric_cutoff' " +
+                      "\n# Some default filters are given below as examples of proper syntax usage.\n");
+        bw.write("\n# Score filters to apply to the variants in DOMINANT genes\nfilterDOM=SAMPLE_MAF < 0.1 and (ESP_MAX_AA_EA < 0.01 and ('D' =~ SIFT))\n");
+        bw.write("\n# Score filters to apply to the variants in RECESSIVE genes\nfilterREC=SAMPLE_MAF < 0.01 and (ESP_MAX_AA_EA < 0.005 and ('D' =~ SIFT))\n");
         bw.write("\n# Include data for these variants regardless of their filter scores\n" +
                 "# Variant syntax: chromosome:position\n" +
                 "# Multiple sites can be given as comma separated.\n#allowedSitesDOM=\n#allowedSitesREC=\n");
@@ -351,7 +357,6 @@ public class globalFunctions {
 
             String[] data = line.split("\t");
             if(data[2].equalsIgnoreCase("gene")) {
-
 
                 chr = data[0];
                 geneStart = Integer.parseInt(data[3]);

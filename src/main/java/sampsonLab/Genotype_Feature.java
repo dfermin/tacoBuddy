@@ -53,7 +53,7 @@ public class Genotype_Feature extends FeatureClass {
             }
 
             for (Allele a : G.getAlleles()) {
-                this.genotype_INT_str += (a.isReference() ? "1" : "0") + "|";
+                this.genotype_INT_str += (a.isReference() ? "0" : "1") + "|";
             }
             this.genotype_INT_str = this.genotype_INT_str.substring(0, this.genotype_INT_str.length() - 1);
         }

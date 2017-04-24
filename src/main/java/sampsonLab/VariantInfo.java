@@ -3,6 +3,7 @@ package sampsonLab;
 import com.google.common.base.Joiner;
 import htsjdk.variant.variantcontext.Genotype;
 import htsjdk.variant.variantcontext.VariantContext;
+import javafx.beans.binding.BooleanExpression;
 import org.apache.commons.jexl3.*;
 
 import java.util.*;
@@ -93,6 +94,11 @@ public class VariantInfo {
     // Function records the requested data from the attributes of the variant object
     public boolean fetchFeature(String feat, VariantContext vc, String transcriptID) {
 
+
+        if(pos == 179521740) {
+            int debug = 1;
+        }
+
         // You only need the transcriptID if the user requested 'EFF' as a filter criteria
 
         if(feat.startsWith("ESP_")) {
@@ -119,7 +125,10 @@ public class VariantInfo {
         }
 
         if(feat.equalsIgnoreCase("GERP")) {
-            String tmp = vc.getAttribute("dbNSFP_GERP___RS", "NaN").toString().replaceAll("[\\[\\]\\s]+", "");
+            String key = "dbNFSP_GERP___RS";
+            if(vc.hasAttribute("dbNSFP_GERP++_RS")) key = "dbNSFP_GERP++_RS";
+
+            String tmp = vc.getAttribute(key, "NaN").toString().replaceAll("[\\[\\]\\s]+", "");
             String[] ary = tmp.split(",");
             userFeatures.put(feat, Double.valueOf(ary[0]));
         }
@@ -143,9 +152,10 @@ public class VariantInfo {
         if(feat.equalsIgnoreCase("IS_LOF")) {
             if( vc.hasAttribute("LOF") ) {
                 String tmp = vc.getAttributeAsString("LOF", "#NULL");
-                if (tmp.equalsIgnoreCase("#NULL")) userFeatures.put(feat, "false");
+                if (tmp.equalsIgnoreCase("#NULL")) userFeatures.put(feat, false);
+                else userFeatures.put(feat, Boolean.valueOf(tmp));
             }
-            else userFeatures.put(feat, "false");
+            else userFeatures.put(feat, false);
         }
 
 
@@ -158,21 +168,10 @@ public class VariantInfo {
     // ran successfully.
     public boolean passesFilter(String jexl_filter_str, String curTS) {
 
-
-        if(pos == 179526214) {
-            int debug = 1;
-        }
-
         boolean retVal = false;
 
-        if(this.userFeatures.containsKey("EFF")) {
-
-            // Quick check to see if this is a synonymous mutation. If it is, automatically fail it
-            if(EFF.isSynonymousVariant(curTS)) return  false;
-
-            // Check to see if this is a high-impact mutation
-            // Keep any high-impact mutations that have a minor allele frequency < req_min_sample_maf in our VCF file
-            if(EFF.checkEFFimpact(curTS, "HIGH") && (this.sample_MAF < globalFunctions.required_min_sample_maf) ) return true;
+        if(pos == 32417936) {
+            int debug = 1;
         }
 
         // check to see if this current variant is among the sites the user specified as 'allowedSites'
@@ -181,6 +180,18 @@ public class VariantInfo {
             retVal = true;
         }
         else {
+
+            if(this.userFeatures.containsKey("EFF")) {
+
+                // Quick check to see if this is a synonymous mutation. If it is, automatically fail it
+                if(EFF.isSynonymousVariant(curTS)) return  false;
+
+                // Check to see if this is a high-impact mutation
+                // Keep any high-impact mutations that have a minor allele frequency < req_min_sample_maf in our VCF file
+                if(EFF.checkEFFimpact(curTS, "HIGH") && (this.sample_MAF < globalFunctions.required_min_sample_maf) ) return true;
+            }
+
+
             JexlEngine jexl = new JexlBuilder().cache(512).strict(true).silent(false).create(); // Create a jexl engine
             JexlExpression expr = jexl.createExpression(jexl_filter_str); // define the expression you want to test/use
 
@@ -200,7 +211,12 @@ public class VariantInfo {
                 if(dataType.equalsIgnoreCase("String")) {
                     jc.set(k, formatStringForJexl((String) o));
                 }
+
+                if(dataType.equalsIgnoreCase("Boolean")) {
+                    jc.set(k, o);
+                }
             }
+
             retVal = (Boolean) expr.evaluate(jc);
 
             if (retVal) passedFilter = true;
@@ -237,6 +253,8 @@ public class VariantInfo {
     public void printSummaryString (String geneId, String transcriptID) {
         int PRECISION = 3;
 
+        if(this.allowedSite != -1) this.modelType += "*";
+
         for(String k : this.candPatients) {
             Genotype_Feature gf = genotypeMap.get(k);
             ArrayList<String> ary = new ArrayList<String>();
@@ -258,11 +276,16 @@ public class VariantInfo {
                 if(this.userFeatures.containsKey(feat)) {
 
                     Object o = this.userFeatures.get(feat);
+
                     if (o.getClass().getSimpleName().equalsIgnoreCase("double")) {
                         double d = (Double) o;
                         if(d == 1000) ary.add(".");
                         else ary.add(dbl2str(d, PRECISION, false));
-                    } else {
+                    }
+                    else if(o.getClass().getSimpleName().equalsIgnoreCase("Boolean")) {
+                        ary.add(String.valueOf(o));
+                    }
+                    else {
                         String tmp = (String) this.userFeatures.get(feat);
                         ary.add( this.makeStringNR(tmp) );
                     }
