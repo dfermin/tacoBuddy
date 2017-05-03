@@ -94,11 +94,6 @@ public class VariantInfo {
     // Function records the requested data from the attributes of the variant object
     public boolean fetchFeature(String feat, VariantContext vc, String transcriptID) {
 
-
-        if(pos == 179521740) {
-            int debug = 1;
-        }
-
         // You only need the transcriptID if the user requested 'EFF' as a filter criteria
 
         if(feat.startsWith("ESP_")) {
@@ -144,9 +139,11 @@ public class VariantInfo {
 
         if(feat.equalsIgnoreCase("EFF")) {
             String tmp = vc.getAttributeAsString("EFF", "#NULL");
-            EFF = new EFF_Features(tmp);
-            tmp = transcriptID.replaceAll("\\.\\d+$", "");
-            userFeatures.put(feat, EFF.findTS(tmp));
+            if(!tmp.equalsIgnoreCase("#NULL")) {
+                EFF = new EFF_Features(tmp);
+                tmp = transcriptID.replaceAll("\\.\\d+$", "");
+                userFeatures.put(feat, EFF.findTS(tmp));
+            }
         }
 
         if(feat.equalsIgnoreCase("IS_LOF")) {
@@ -170,7 +167,7 @@ public class VariantInfo {
 
         boolean retVal = false;
 
-        if(pos == 32417936) {
+        if(curTS.equalsIgnoreCase("ENST00000333371") && this.getID().equalsIgnoreCase("15:91550705")) {
             int debug = 1;
         }
 
@@ -204,12 +201,17 @@ public class VariantInfo {
                 Object o = this.userFeatures.get(k);
                 String dataType = o.getClass().getSimpleName();
 
+                // The user may have selected to report a feature they are not filtering the data on.
+                // This if-statement prevents an error with JEXL in these cases
+                if( !jexl_filter_str.toUpperCase().contains(k.toUpperCase()) ) continue;
+
                 if(dataType.equalsIgnoreCase("Double")) {
                     jc.set(k, o);
                 }
 
                 if(dataType.equalsIgnoreCase("String")) {
-                    jc.set(k, formatStringForJexl((String) o));
+                    String tmp = (String) o;
+                    jc.set(k, formatStringForJexl(tmp.replaceAll("#NULL", "#")));
                 }
 
                 if(dataType.equalsIgnoreCase("Boolean")) {

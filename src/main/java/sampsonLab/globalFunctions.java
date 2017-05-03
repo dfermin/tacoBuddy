@@ -35,12 +35,12 @@ public class globalFunctions {
     static public Set<String> genesDOM = null;
     static public Set<String> genesREC = null;
     static public SortedSet<String> featureSet = null;
-    static public SetMultimap<String, Transcript> REC_geneMap = null, DOM_geneMap = null;
+    static public SetMultimap<String, Transcript> REC_geneMap = null, DOM_geneMap = null, ALL_geneMap = null;
     static public Map<String, String> allowedSitesMap = null;
 
 
 
-
+    /*----------------------------------------------------------------------------------------------------------------*/
     static public void parseCommandLineArgs(String[] args) throws IOException, SQLException {
         File paramF = null;
 
@@ -66,13 +66,14 @@ public class globalFunctions {
             inputVCF = new File(vcf);
             inputVCF_tabix = new File(tbi);
             VCFParser vcfp = new VCFParser(inputVCF, inputVCF_tabix);
-            vcfp.getINFOfields();
+            vcfp.printINFOfields();
             System.exit(0);
         }
     }
 
 
-    private static void parseParamFile(File paramF) throws IOException {
+    /*----------------------------------------------------------------------------------------------------------------*/
+    private static void parseParamFile(File paramF) throws IOException, SQLException {
         FileReader fr = new FileReader(paramF);
         BufferedReader br = new BufferedReader(fr);
 
@@ -109,12 +110,18 @@ public class globalFunctions {
             if(line.startsWith("genesDOM=")) {
                 genesDOM = new HashSet<String>();
                 String[] tmp = line.substring(9).split("[,\\t;\\s]");
-                for(String s: tmp) genesDOM.add(s.replaceAll("\\s*", ""));
+                for(String s: tmp) {
+                    String s2 = s.replaceAll("\\s*", "");
+                    if(s2.length() > 1) genesDOM.add(s2);
+                }
             }
             if(line.startsWith("genesREC=")) {
                 genesREC = new HashSet<String>();
                 String[] tmp = line.substring(9).split("[,\\t;\\s]");
-                for(String s: tmp) genesREC.add(s.replaceAll("\\s*", ""));
+                for(String s: tmp) {
+                    String s2 = s.replaceAll("\\s*", "");
+                    if(s2.length() > 1) genesREC.add(s2);
+                }
             }
 
             if(line.startsWith("transcriptModel=")) {
@@ -150,7 +157,10 @@ public class globalFunctions {
         }
         br.close();
 
+
+        //recordVCFinfoFields();
         errorCheck_paramFile_input();
+
 
         // If you go this far you had an acceptable input file. Report all copied values to STDERR
         System.err.print("\n-------------------------------------------------------------\n");
@@ -162,10 +172,15 @@ public class globalFunctions {
         System.err.print("Transcript model: " + outputTranscript + "\n");
         if( outputTranscript.equalsIgnoreCase("mostConserved") ) System.err.print("TIMS file:    " + TIMSfile.getName() + "\n");
 
-        if( genesDOM.size() > 0 ) System.err.print("DOM genes:    " + genesDOM + "\n");
-        if( genesREC.size() > 0 ) System.err.print("REC genes:    " + genesREC + "\n");
-        if( filterDOM != null )   System.err.print("DOM filters:  " + filterDOM + "\n");
-        if( filterREC != null )   System.err.print("REC filters:  " + filterREC + "\n");
+        if( (genesDOM.size() == 0) && (genesREC.size() == 0) ) {
+            System.err.print("Processing all genes in:  " + srcGFF3.getName() + "\n");
+        }
+        else {
+            if (genesDOM.size() > 0) System.err.print("DOM genes:    " + genesDOM + "\n");
+            if (genesREC.size() > 0) System.err.print("REC genes:    " + genesREC + "\n");
+        }
+        if (filterDOM != null) System.err.print("DOM filters:  " + filterDOM + "\n");
+        if (filterREC != null) System.err.print("REC filters:  " + filterREC + "\n");
         System.err.print("Selected output features: " + Joiner.on(", ").join(featureSet) + "\n");
 
         if( !(null == allowedSitesMap) && (allowedSitesMap.size() > 0) ) {
@@ -176,6 +191,7 @@ public class globalFunctions {
     }
 
 
+    /*----------------------------------------------------------------------------------------------------------------*/
     private static void errorCheck_paramFile_input() {
         int score = 0;
 
@@ -220,10 +236,6 @@ public class globalFunctions {
         score = 0;
         if( genesDOM.size() > 0 ) score++;
         if( genesREC.size() > 0 ) score++;
-        if( score == 0 ) {
-            System.err.println("\nERROR! You must provide a value for EITHER genesDOM or genesREC (or both) in the input file\n");
-            System.exit(0);
-        }
 
         score = 0;
         if( (null != filterDOM) && (filterDOM.length() > 0) ) score++;
@@ -232,9 +244,57 @@ public class globalFunctions {
             System.err.println("\nERROR! You must provide a value for EITHER filterDOM or filterREC (or both) in the input file\n");
             System.exit(0);
         }
+
+        checkFilterStrings(filterDOM);
+        checkFilterStrings(filterREC);
     }
 
+    /*----------------------------------------------------------------------------------------------------------------*/
+    // Function parses the given filter string to make sure all of the features in the string are also
+    // listed in the featuresList object. Any missing features will be added.
+    public static void checkFilterStrings(String filter_str) {
 
+        ArrayList<String> bits = new ArrayList<String>();
+
+        if(null == filter_str) return;
+
+        // Strip the string of parentheses
+        filter_str = filter_str.replaceAll("[\\(\\)']+", "");
+
+        // First split the string up by 'and' & 'or' statements
+        String[] parts = filter_str.split("and|or");
+
+        for(String p : parts) {
+
+            // Now split this string up by regex symbols
+            String[] parts2 = p.split("[=~<>\\s]+");
+            for(String p2 : parts2) {
+
+                if(Pattern.matches("^[\\d\\.-]+$", p2)) continue; // just a number
+                if(p2.length() < 3) continue;
+                bits.add(p2);
+            }
+        }
+
+        // 'bits' now contains only words/terms to filter on.
+        // Curate the data in 'bits' removing any special values that are not going to match
+        // a VCF INFO field but are instead computed internally by this program.
+        ArrayList<String> cleanBits = new ArrayList<String>();
+        for(String b : bits) {
+            if(b.equalsIgnoreCase("HIGH")) continue;
+            if(b.equalsIgnoreCase("MODERATE")) continue;
+            if(b.equalsIgnoreCase("LOW")) continue;
+
+            cleanBits.add(b);
+        }
+
+        // Got through cleanBits and make sure they are in the final output feature list
+        for(String b : cleanBits) {
+            if( !featureSet.contains(b) ) featureSet.add(b);
+        }
+    }
+
+    /*----------------------------------------------------------------------------------------------------------------*/
     // Function reformats the user filter to make sure it will work with jexl
     // Specifically it converts: /[AD] =~ SIFT/ to ('A' =~ SIFT) or ('D' =~ SIFT)
     private static String reformat_filter(String origFilter) {
@@ -285,7 +345,7 @@ public class globalFunctions {
     }
 
 
-
+    /*----------------------------------------------------------------------------------------------------------------*/
     private static void writeTemplateInputFile() throws IOException {
         File templateF = new File("./tacoBuddy-inputTemplate.txt");
         FileWriter fw = new FileWriter(templateF);
@@ -300,7 +360,7 @@ public class globalFunctions {
         bw.write("\n# Specify the minimum Sample minor allele frequecy (MAF) that a variant call must have in order to be reported\nmin_sample_maf=0.05");
         bw.write("\n# Specify query method for reporting variant calls." +
                       "\n# 'transcript' = look for variants within the boundaries of a transcript" +
-                      "\n# 'exon' = look for variants within the coding boundaries of exons" +
+                      "\n# 'exon' = look for variants within the coding boundaries of exons\n" +
                       "queryMode=transcript\n");
         bw.write("\n# List the variant information (ie: features) in the VCF file you want to report in the final output.\n" +
                         "# NOTE: This list _MUST_ contain all of the field names you use in 'filterDOM' and filterREC' below.\n" +
@@ -329,11 +389,14 @@ public class globalFunctions {
     }
 
 
-
+    /*----------------------------------------------------------------------------------------------------------------*/
     public void parseGFF3() throws IOException {
 
-        REC_geneMap = HashMultimap.create(); // k = geneName, v = list of transcripts
-        DOM_geneMap = HashMultimap.create(); // k = geneName, v = list of transcripts
+        if(this.genesREC.size() > 0) REC_geneMap = HashMultimap.create(); // k = geneName, v = list of transcripts
+        if(this.genesDOM.size() > 0) DOM_geneMap = HashMultimap.create(); // k = geneName, v = list of transcripts
+
+        if( (this.genesDOM.size() == 0) && (this.genesREC.size() == 0)) ALL_geneMap = HashMultimap.create();
+
         BufferedReader br = null;
 
         System.err.print("\nParsing " + srcGFF3.getName() + "\n");
@@ -380,6 +443,7 @@ public class globalFunctions {
                     curTranscript.calcCDSlength();
                     if(genesDOM.contains(curTranscript.getGeneName())) DOM_geneMap.put(curTranscript.getGeneName(), curTranscript);
                     else if(genesREC.contains(curTranscript.getGeneName())) REC_geneMap.put(curTranscript.getGeneName(), curTranscript);
+                    else ALL_geneMap.put(curTranscript.getGeneName(), curTranscript);
                 }
                 curTranscript = null;
 
@@ -439,9 +503,9 @@ public class globalFunctions {
         }
         br.close();
 
-        System.err.print(
-                "DOM gene map size: " + DOM_geneMap.asMap().size() +
-                "\nREC gene map size: " + REC_geneMap.asMap().size() + "\n");
+        if(this.genesDOM.size() > 0) System.err.println("DOM gene map size: " + DOM_geneMap.asMap().size());
+        if(this.genesREC.size() > 0) System.err.println("REC gene map size: " + REC_geneMap.asMap().size());
+        if(this.ALL_geneMap.asMap().size() > 0) System.err.println("Gene map size: " + ALL_geneMap.asMap().size());
     }
 
 
@@ -535,36 +599,58 @@ public class globalFunctions {
 
             gene2transMap = new HashMap<String, Transcript>();
 
-            for(String gene : DOM_geneMap.keys()) {
-                tsLen = 0;
-                best_TS = null;
-                for(Transcript ts : DOM_geneMap.get(gene)) {
-                    if(ts.getTsLen() > tsLen) {
-                        tsLen = ts.getTsLen();
-                        best_TS = ts;
+            if(null != ALL_geneMap) {
+                for (String gene : ALL_geneMap.keys()) {
+                    tsLen = 0;
+                    best_TS = null;
+                    for (Transcript ts : ALL_geneMap.get(gene)) {
+                        if (ts.getTsLen() > tsLen) {
+                            tsLen = ts.getTsLen();
+                            best_TS = ts;
+                        }
                     }
+                    gene2transMap.put(gene, best_TS);
                 }
-                gene2transMap.put(gene, best_TS);
+                ALL_geneMap.clear();
+                for (String k : gene2transMap.keySet()) ALL_geneMap.put(k, gene2transMap.get(k));
+                gene2transMap.clear();
             }
-            DOM_geneMap.clear();
-            for(String k : gene2transMap.keySet()) DOM_geneMap.put(k, gene2transMap.get(k));
-            gene2transMap.clear();
 
 
-            for(String gene : REC_geneMap.keys()) {
-                tsLen = 0;
-                best_TS = null;
-                for(Transcript ts : REC_geneMap.get(gene)) {
-                    if(ts.getTsLen() > tsLen) {
-                        tsLen = ts.getTsLen();
-                        best_TS = ts;
+            if(null != DOM_geneMap) {
+                for (String gene : DOM_geneMap.keys()) {
+                    tsLen = 0;
+                    best_TS = null;
+                    for (Transcript ts : DOM_geneMap.get(gene)) {
+                        if (ts.getTsLen() > tsLen) {
+                            tsLen = ts.getTsLen();
+                            best_TS = ts;
+                        }
                     }
+                    gene2transMap.put(gene, best_TS);
                 }
-                gene2transMap.put(gene, best_TS);
+                DOM_geneMap.clear();
+                for (String k : gene2transMap.keySet()) DOM_geneMap.put(k, gene2transMap.get(k));
+                gene2transMap.clear();
             }
-            REC_geneMap.clear();
-            for(String k : gene2transMap.keySet()) REC_geneMap.put(k, gene2transMap.get(k));
-            gene2transMap.clear();
+
+
+            if(null != REC_geneMap) {
+                for (String gene : REC_geneMap.keys()) {
+                    tsLen = 0;
+                    best_TS = null;
+                    for (Transcript ts : REC_geneMap.get(gene)) {
+                        if (ts.getTsLen() > tsLen) {
+                            tsLen = ts.getTsLen();
+                            best_TS = ts;
+                        }
+                    }
+                    gene2transMap.put(gene, best_TS);
+                }
+                REC_geneMap.clear();
+                for (String k : gene2transMap.keySet()) REC_geneMap.put(k, gene2transMap.get(k));
+                gene2transMap.clear();
+            }
         }
     }
 

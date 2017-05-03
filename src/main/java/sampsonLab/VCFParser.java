@@ -7,10 +7,7 @@ import htsjdk.variant.vcf.VCFFileReader;
 
 import java.io.File;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
 
 
 /**
@@ -34,7 +31,7 @@ public class VCFParser {
 
     /*****************************************************************************************************************/
     // Function prints out all of the unique INFO fields the user can query in the VCF file
-    public void getINFOfields() {
+    public void printINFOfields() {
         TreeMap<String, String> infoMap = new TreeMap<String, String>();
         VCFFileReader vcfr = new VCFFileReader(inputVCF, inputVCF_tabix);
 
@@ -52,8 +49,27 @@ public class VCFParser {
         for(String k : infoMap.keySet()) {
             System.out.println(k + "\t" + infoMap.get(k));
         }
-
     }
+
+
+    /*****************************************************************************************************************/
+    // Function returns all of the unique INFO fields the user can query in the VCF file
+    public Set<String> getINFOfields() {
+        HashSet<String> info = new HashSet<String>();
+        VCFFileReader vcfr = new VCFFileReader(inputVCF, inputVCF_tabix);
+
+        CloseableIterator<VariantContext> it = vcfr.iterator();
+        while(it.hasNext()) {
+            VariantContext vc = it.next();
+            for(String k : vc.getAttributes().keySet()) {
+                Object o = vc.getAttribute(k);
+                info.add(k);
+            }
+        }
+        vcfr.close();
+        return info;
+    }
+
 
 
     /*****************************************************************************************************************/

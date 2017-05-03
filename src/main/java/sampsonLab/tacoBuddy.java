@@ -56,14 +56,46 @@ public class tacoBuddy {
         System.out.println(hdr);
 
         // Record any variants that land within the exons of the genes stored in DOM and REC maps
+        // If the genesDOM or genesREC sets are empty, we assume the user wants us to process all genes
         if(globals.queryMode.equalsIgnoreCase("exon")) {
-            if (globals.DOM_geneMap.size() > 0) the_vcf_parser.parseByExon(globals.DOM_geneMap, globals.filterDOM, "DOM");
-            if (globals.REC_geneMap.size() > 0) the_vcf_parser.parseByExon(globals.REC_geneMap, globals.filterREC, "REC");
+
+            for(String geneType :  new String[] { "DOM", "REC"}) {
+
+                if(geneType.equalsIgnoreCase("DOM")) {
+                    if(globals.genesDOM.size() > 0)
+                        the_vcf_parser.parseByExon(globals.DOM_geneMap, globals.filterDOM, geneType);
+                    else if(globals.ALL_geneMap.asMap().size() > 0)
+                        the_vcf_parser.parseByExon(globals.ALL_geneMap, globals.filterDOM, geneType);
+                }
+
+                if(geneType.equalsIgnoreCase("REC"))
+                    if(globals.genesREC.size() > 0)
+                        the_vcf_parser.parseByExon(globals.REC_geneMap, globals.filterREC, geneType);
+                    else if(globals.ALL_geneMap.asMap().size() > 0)
+                        the_vcf_parser.parseByExon(globals.ALL_geneMap, globals.filterREC, geneType);
+
+            }
         }
 
+        // Record any variants that land within the transcripts of the genes stored in DOM and REC maps
         if(globals.queryMode.equalsIgnoreCase("transcript")) {
-            if (globals.DOM_geneMap.size() > 0) the_vcf_parser.parseByTranscript(globals.DOM_geneMap, globals.filterDOM, "DOM");
-            if (globals.REC_geneMap.size() > 0) the_vcf_parser.parseByTranscript(globals.REC_geneMap, globals.filterREC, "REC");
+
+            for(String geneType :  new String[] { "DOM", "REC"}) {
+
+                if(geneType.equalsIgnoreCase("DOM")) {
+                    if(globals.genesDOM.size() > 0)
+                        the_vcf_parser.parseByTranscript(globals.DOM_geneMap, globals.filterDOM, geneType);
+                    else if(globals.ALL_geneMap.asMap().size() > 0)
+                        the_vcf_parser.parseByTranscript(globals.ALL_geneMap, globals.filterDOM, geneType);
+                }
+
+                if(geneType.equalsIgnoreCase("REC"))
+                    if(globals.genesREC.size() > 0)
+                        the_vcf_parser.parseByTranscript(globals.REC_geneMap, globals.filterREC, geneType);
+                    else if(globals.ALL_geneMap.asMap().size() > 0)
+                        the_vcf_parser.parseByTranscript(globals.ALL_geneMap, globals.filterREC, geneType);
+
+            }
         }
     }
 
