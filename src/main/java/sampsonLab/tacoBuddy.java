@@ -19,6 +19,7 @@ public class tacoBuddy {
     static public globalFunctions globals;
     static public VariantInfoNameMap VCF_Info_Name_Map;
     static VCFParser the_vcf_parser;
+    static GFFParser gff3_parser;
     static ArrayList<JRSUIConstants.Variant> DOM_var = null, REC_var = null;
 
 
@@ -37,7 +38,11 @@ public class tacoBuddy {
         }
 
         globals.parseCommandLineArgs(args);
-        globals.parseGFF3();
+
+        gff3_parser = new GFFParser(globals.srcGFF3);
+        gff3_parser.parse(globals);
+        gff3_parser = null;
+
         globals.selectTranscriptModel();
 
         the_vcf_parser = new VCFParser(globals.inputVCF, globals.inputVCF_tabix);
@@ -64,14 +69,14 @@ public class tacoBuddy {
                 if(geneType.equalsIgnoreCase("DOM")) {
                     if(globals.genesDOM.size() > 0)
                         the_vcf_parser.parseByExon(globals.DOM_geneMap, globals.filterDOM, geneType);
-                    else if(globals.ALL_geneMap.asMap().size() > 0)
+                    else if( (globals.ALL_geneMap.asMap().size() > 0) && !(null == globals.filterDOM) )
                         the_vcf_parser.parseByExon(globals.ALL_geneMap, globals.filterDOM, geneType);
                 }
 
                 if(geneType.equalsIgnoreCase("REC"))
                     if(globals.genesREC.size() > 0)
                         the_vcf_parser.parseByExon(globals.REC_geneMap, globals.filterREC, geneType);
-                    else if(globals.ALL_geneMap.asMap().size() > 0)
+                    else if( (globals.ALL_geneMap.asMap().size() > 0) && !(null == globals.filterREC) )
                         the_vcf_parser.parseByExon(globals.ALL_geneMap, globals.filterREC, geneType);
 
             }

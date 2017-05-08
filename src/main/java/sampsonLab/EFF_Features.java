@@ -45,14 +45,16 @@ public class EFF_Features extends FeatureClass {
         impactMap = new HashMap<String, Integer>();
 
         // this array will contain 1 entry per transcript affected by the variant call
-        String[] inputAry = ss.replaceAll("[\\[\\]]+", "").split(",");
+        String ss2 = ss.replaceAll("[\\[\\]]+", "");
+        String[] inputAry = ss2.split(",");
 
         for(String s : inputAry) {
 
             String[] tmpAry = s.split("\\|");
 
             String label = tmpAry[0].substring(0,tmpAry[0].indexOf('(')).trim(); // gets the "assigned effect" of this variant on the given gene.
-            label = label.replaceAll("_variant", "");
+            String tmp2 = label.replaceAll("_variant", "");
+            label = tmp2;
 
             String transId = "";
             String protAA = "#NULL";

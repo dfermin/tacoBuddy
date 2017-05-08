@@ -44,20 +44,32 @@ public class Genotype_Feature extends FeatureClass {
                 this.genotypeInt = 2;
             }
 
-            if (G.hasGQ()) this.GQ = G.getGQ();
 
-            if (G.hasAD()) {
-                this.refReadDepth = G.getAD()[0];
-                this.altReadDepth = G.getAD()[1];
-                this.totReadDepth = this.refReadDepth + this.altReadDepth;
+            // This happens when one of the alleles is not called (example: A/. or ./T)
+            // We can't use this instance so we set it to '.' and move on.
+            if(this.genotype_word.equalsIgnoreCase("#NULL")) {
+                this.genotype_DNA_str = ".";
+                this.genotype_INT_str = ".";
             }
+            else {
+                if (G.hasGQ()) this.GQ = G.getGQ();
 
-            for (Allele a : G.getAlleles()) {
-                this.genotype_INT_str += (a.isReference() ? "0" : "1") + "|";
-            }
-            this.genotype_INT_str = this.genotype_INT_str.substring(0, this.genotype_INT_str.length() - 1);
+                if (G.hasAD()) {
+                    this.refReadDepth = G.getAD()[0];
+                    this.altReadDepth = G.getAD()[1];
+                    this.totReadDepth = this.refReadDepth + this.altReadDepth;
+                }
+
+
+                for (Allele a : G.getAlleles()) {
+                    String call = a.getDisplayString();
+                    this.genotype_INT_str += (a.isReference() ? "0" : "1") + "|";
+                }
+                this.genotype_INT_str = this.genotype_INT_str.substring(0, this.genotype_INT_str.length() - 1);
+            } // end 'else' over valid genotype call
+
         }
-        else {
+        else { // genotype wasn't called in this subject so move on.
             this.genotype_DNA_str = ".";
             this.genotype_INT_str = ".";
         }

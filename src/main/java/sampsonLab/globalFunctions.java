@@ -157,8 +157,6 @@ public class globalFunctions {
         }
         br.close();
 
-
-        //recordVCFinfoFields();
         errorCheck_paramFile_input();
 
 
@@ -232,21 +230,23 @@ public class globalFunctions {
             System.exit(0);
         }
 
-
+        // Checking the filter fields
         score = 0;
-        if( genesDOM.size() > 0 ) score++;
-        if( genesREC.size() > 0 ) score++;
+        if( (null != filterDOM) && (filterDOM.length() > 0) ) {
+            score++;
+            checkFilterStrings(filterDOM);
+        }
 
-        score = 0;
-        if( (null != filterDOM) && (filterDOM.length() > 0) ) score++;
-        if( (null != filterREC) && (filterREC.length() > 0) ) score++;
+        if( (null != filterREC) && (filterREC.length() > 0) ) {
+            score++;
+            checkFilterStrings(filterREC);
+        }
+
         if( score == 0 ) {
-            System.err.println("\nERROR! You must provide a value for EITHER filterDOM or filterREC (or both) in the input file\n");
+            System.err.println("\nERROR! You must provide a value for EITHER filterDOM, filterREC (or both) in the input file\n");
             System.exit(0);
         }
 
-        checkFilterStrings(filterDOM);
-        checkFilterStrings(filterREC);
     }
 
     /*----------------------------------------------------------------------------------------------------------------*/
@@ -366,10 +366,11 @@ public class globalFunctions {
                         "# NOTE: This list _MUST_ contain all of the field names you use in 'filterDOM' and filterREC' below.\n" +
                         "# The entries here can be separated by tabs, spaces, commas or semicolons\n" +
                         "featureList=EFF\n");
-        bw.write("\n# Enter regex-like filters there for genes. " +
-                      "\n# The syntax is **CRITICAL** here. You must write your text-based expressions as: 'query_term' =~ 'filter_field' " +
-                      "\n# For 'or' conditions surround the whole regex in forward slashes. Example: /['DT'] =~ SIFT/" +
-                      "\n# Numerical filters are written as 'filter_field' <= 'numeric_cutoff' " +
+        bw.write("\n# Enter regex-like filters here for genes." +
+                      "\n# The syntax is **CRITICAL** here. The following syntax rules must be followed:\n" +
+                      "\n# 1. You must write your text-based expressions as: 'query_term' =~ 'filter_field' " +
+                      "\n# 2. For 'or' conditions surround the whole regex in forward slashes. Example: /['DT'] =~ SIFT/" +
+                      "\n# 3. Numerical filters are written as 'filter_field' <= 'numeric_cutoff' " +
                       "\n# Some default filters are given below as examples of proper syntax usage.\n");
         bw.write("\n# Score filters to apply to the variants in DOMINANT genes\nfilterDOM=SAMPLE_MAF < 0.1 and (ESP_MAX_AA_EA < 0.01 and ('D' =~ SIFT))\n");
         bw.write("\n# Score filters to apply to the variants in RECESSIVE genes\nfilterREC=SAMPLE_MAF < 0.01 and (ESP_MAX_AA_EA < 0.005 and ('D' =~ SIFT))\n");
@@ -386,126 +387,6 @@ public class globalFunctions {
         bw.close();
 
         System.err.print("\nEdit template file: " + templateF.getCanonicalPath() + "\n");
-    }
-
-
-    /*----------------------------------------------------------------------------------------------------------------*/
-    public void parseGFF3() throws IOException {
-
-        if(this.genesREC.size() > 0) REC_geneMap = HashMultimap.create(); // k = geneName, v = list of transcripts
-        if(this.genesDOM.size() > 0) DOM_geneMap = HashMultimap.create(); // k = geneName, v = list of transcripts
-
-        if( (this.genesDOM.size() == 0) && (this.genesREC.size() == 0)) ALL_geneMap = HashMultimap.create();
-
-        BufferedReader br = null;
-
-        System.err.print("\nParsing " + srcGFF3.getName() + "\n");
-
-        if(srcGFF3.getName().endsWith(".gz")) {
-            GZIPInputStream gzip = new GZIPInputStream(new FileInputStream(srcGFF3.getAbsoluteFile()));
-            br = new BufferedReader(new InputStreamReader(gzip));
-        }
-        else {
-            FileReader fr = new FileReader(srcGFF3);
-            br = new BufferedReader(fr);
-        }
-
-        Transcript curTranscript = null;
-        int geneStart = -1, geneEnd = -1;
-        char strand = '.';
-        String geneID = null, geneType = null, geneName = null, chr = null, line = null;
-
-        while((line = br.readLine()) != null) {
-            if(line.startsWith("#")) continue;
-
-            String[] data = line.split("\t");
-            if(data[2].equalsIgnoreCase("gene")) {
-
-                chr = data[0];
-                geneStart = Integer.parseInt(data[3]);
-                geneEnd = Integer.parseInt(data[4]);
-                strand = data[6].charAt(0);
-
-
-                String info[] = data[8].split(";");
-                for (String s : info) {
-                    if (s.startsWith("ID=")) geneID = s.substring(3).replaceAll("\\..+$", "");  // remove version number from ENSG id
-                    if (s.startsWith("gene_type=")) geneType = s.substring(10);
-                    if (s.startsWith("gene_name=")) geneName = s.substring(10);
-                }
-            }
-
-            if(data[2].equalsIgnoreCase("transcript")) {
-
-                // Check to see if curTranscript is null, if it isn't you need to store this variable
-                // before you can continue;
-                if(curTranscript != null) {
-                    curTranscript.calcCDSlength();
-                    if(genesDOM.contains(curTranscript.getGeneName())) DOM_geneMap.put(curTranscript.getGeneName(), curTranscript);
-                    else if(genesREC.contains(curTranscript.getGeneName())) REC_geneMap.put(curTranscript.getGeneName(), curTranscript);
-                    else ALL_geneMap.put(curTranscript.getGeneName(), curTranscript);
-                }
-                curTranscript = null;
-
-                int start = Integer.parseInt(data[3]);
-                int end = Integer.parseInt(data[4]);
-
-                String localGeneName = null, transID = null;
-
-                String info[] = data[8].split(";");
-                for (String s : info) {
-                    if (s.startsWith("ID=")) transID = s.substring(3).replaceAll("\\..+$", ""); // remove version number from ENST id
-                    if (s.startsWith("gene_name=")) localGeneName = s.substring(10);
-                }
-
-                if (!localGeneName.equalsIgnoreCase(geneName)) {
-                    System.err.print("\nERROR! (transcript): " + localGeneName + " != " + geneName + " for current line of srcGFF3:\n" +
-                            line + "\n\n");
-                    System.exit(0);
-                }
-
-                // Create a new transcript entry
-                curTranscript = new Transcript(chr,
-                        geneStart, geneEnd,
-                        strand, geneID, geneType, localGeneName,
-                        start, end, transID);
-            }
-
-
-            if(data[2].equalsIgnoreCase("exon")) {
-                int start = Integer.parseInt(data[3]);
-                int end = Integer.parseInt(data[4]);
-
-                String transID = null, exonID = null;
-                int exonNum = 0;
-                String info[] = data[8].split(";");
-                for (String s : info) {
-                    if (s.startsWith("Parent=")) transID = s.substring(7).replaceAll("\\..+$", "");
-                    if (s.startsWith("exon_id=")) exonID = s.substring(8).replaceAll("\\..+$", "");
-                    if (s.startsWith("exon_number=")) exonNum = Integer.parseInt(s.substring(12));
-                }
-
-                if(!transID.equalsIgnoreCase(curTranscript.getTranscriptID())) {
-                    System.err.print("\nERROR! (exon): " + transID + " != " + curTranscript.getTranscriptID() + " for current line of srcGFF3:" +
-                            line + "\n\n");
-                    System.exit(0);
-                }
-
-                Exon E = new Exon(exonID,
-                        curTranscript.getGeneName(),
-                        curTranscript.getChrom(),
-                        start, end, exonNum
-                        );
-
-                curTranscript.addExon(E);
-                E = null;
-            }
-        }
-        br.close();
-
-        if(this.genesDOM.size() > 0) System.err.println("DOM gene map size: " + DOM_geneMap.asMap().size());
-        if(this.genesREC.size() > 0) System.err.println("REC gene map size: " + REC_geneMap.asMap().size());
-        if(this.ALL_geneMap.asMap().size() > 0) System.err.println("Gene map size: " + ALL_geneMap.asMap().size());
     }
 
 

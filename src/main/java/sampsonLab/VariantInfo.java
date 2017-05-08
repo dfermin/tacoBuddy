@@ -167,25 +167,31 @@ public class VariantInfo {
 
         boolean retVal = false;
 
-        if(curTS.equalsIgnoreCase("ENST00000333371") && this.getID().equalsIgnoreCase("15:91550705")) {
-            int debug = 1;
-        }
-
         // check to see if this current variant is among the sites the user specified as 'allowedSites'
         if(this.allowedSite > -1) {
             passedFilter = true;
             retVal = true;
+        }
+        else if(this.sample_MAF == 0) {
+            // This means that the variant has been declared as unobserved in the VCF file. It doesn't pass the filter
+            passedFilter = false;
         }
         else {
 
             if(this.userFeatures.containsKey("EFF")) {
 
                 // Quick check to see if this is a synonymous mutation. If it is, automatically fail it
-                if(EFF.isSynonymousVariant(curTS)) return  false;
+                if(EFF.isSynonymousVariant(curTS)) {
+                    passedFilter = false;
+                    return  false;
+                }
 
                 // Check to see if this is a high-impact mutation
                 // Keep any high-impact mutations that have a minor allele frequency < req_min_sample_maf in our VCF file
-                if(EFF.checkEFFimpact(curTS, "HIGH") && (this.sample_MAF < globalFunctions.required_min_sample_maf) ) return true;
+                if(EFF.checkEFFimpact(curTS, "HIGH") && (this.sample_MAF < globalFunctions.required_min_sample_maf) ) {
+                    passedFilter = true;
+                    return true;
+                }
             }
 
 
@@ -311,7 +317,7 @@ public class VariantInfo {
         for(String s : sampleNames) {
             Genotype G = vc.getGenotype(s);
             Genotype_Feature gf = new Genotype_Feature(s, G);
-            genotypeMap.put(s, gf);
+            this.genotypeMap.put(s, gf);
         }
 
         this.calcSampleAF();
@@ -355,6 +361,7 @@ public class VariantInfo {
         double n = 0;
 
         for(Genotype_Feature g : genotypeMap.values()) {
+
             if(g.genotype_DNA_str.equalsIgnoreCase(".")) continue; // the variant wasn't called for this person so skip this instance
             n++;
             sum += g.genotypeInt;
