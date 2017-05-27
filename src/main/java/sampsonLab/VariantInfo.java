@@ -167,10 +167,6 @@ public class VariantInfo {
 
         boolean retVal = false;
 
-        if(curTS.equalsIgnoreCase("ENST00000333371") && this.getID().equalsIgnoreCase("15:91550705")) {
-            int debug = 1;
-        }
-
         // check to see if this current variant is among the sites the user specified as 'allowedSites'
         if(this.allowedSite > -1) {
             passedFilter = true;
@@ -188,6 +184,7 @@ public class VariantInfo {
                 if(EFF.checkEFFimpact(curTS, "HIGH") && (this.sample_MAF < globalFunctions.required_min_sample_maf) ) return true;
             }
 
+//            System.out.println(jexl_filter_str);
 
             JexlEngine jexl = new JexlBuilder().cache(512).strict(true).silent(false).create(); // Create a jexl engine
             JexlExpression expr = jexl.createExpression(jexl_filter_str); // define the expression you want to test/use

@@ -371,8 +371,8 @@ public class globalFunctions {
                       "\n# For 'or' conditions surround the whole regex in forward slashes. Example: /['DT'] =~ SIFT/" +
                       "\n# Numerical filters are written as 'filter_field' <= 'numeric_cutoff' " +
                       "\n# Some default filters are given below as examples of proper syntax usage.\n");
-        bw.write("\n# Score filters to apply to the variants in DOMINANT genes\nfilterDOM=SAMPLE_MAF < 0.1 and (ESP_MAX_AA_EA < 0.01 and ('D' =~ SIFT))\n");
-        bw.write("\n# Score filters to apply to the variants in RECESSIVE genes\nfilterREC=SAMPLE_MAF < 0.01 and (ESP_MAX_AA_EA < 0.005 and ('D' =~ SIFT))\n");
+        bw.write("\n# Score filters to apply to the variants in DOMINANT genes\nfilterDOM=SAMPLE_MAF < 0.1 and (ESP_MAX_AA_EA < 0.005 and (( (POLYPHEN2_HVAR =~ 'D') + /['AD'] =~ MUTATIONTASTER/ + (SIFT =~ 'D')) >= 2)) or (ESP_MAX_AA_EA < 0.005 and IS_LOF)\n\n");
+        bw.write("\n# Score filters to apply to the variants in RECESSIVE genes\nfilterREC=SAMPLE_MAF < 0.1 and (ESP_MAX_AA_EA < 0.01 and (( (POLYPHEN2_HVAR =~ 'D') + /['AD'] =~ MUTATIONTASTER/ + (SIFT == 'D')) >= 2)) or (ESP_MAX_AA_EA < 0.01 and IS_LOF)\n\n");
         bw.write("\n# Include data for these variants regardless of their filter scores\n" +
                 "# Variant syntax: chromosome:position\n" +
                 "# Multiple sites can be given as comma separated.\n#allowedSitesDOM=\n#allowedSitesREC=\n");
@@ -443,7 +443,7 @@ public class globalFunctions {
                     curTranscript.calcCDSlength();
                     if(genesDOM.contains(curTranscript.getGeneName())) DOM_geneMap.put(curTranscript.getGeneName(), curTranscript);
                     else if(genesREC.contains(curTranscript.getGeneName())) REC_geneMap.put(curTranscript.getGeneName(), curTranscript);
-                    else ALL_geneMap.put(curTranscript.getGeneName(), curTranscript);
+                    else if( null != ALL_geneMap ) ALL_geneMap.put(curTranscript.getGeneName(), curTranscript);
                 }
                 curTranscript = null;
 
@@ -505,7 +505,7 @@ public class globalFunctions {
 
         if(this.genesDOM.size() > 0) System.err.println("DOM gene map size: " + DOM_geneMap.asMap().size());
         if(this.genesREC.size() > 0) System.err.println("REC gene map size: " + REC_geneMap.asMap().size());
-        if(this.ALL_geneMap.asMap().size() > 0) System.err.println("Gene map size: " + ALL_geneMap.asMap().size());
+        if( (null != this.ALL_geneMap) && (this.ALL_geneMap.asMap().size() > 0)) System.err.println("Gene map size: " + ALL_geneMap.asMap().size());
     }
 
 

@@ -6,11 +6,9 @@ package sampsonLab;
 
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.ArrayList;
 
-import apple.laf.JRSUIConstants;
 import com.google.common.base.Joiner;
-import org.apache.commons.cli.ParseException;
+import org.apache.commons.jexl3.parser.ParseException;
 
 
 public class tacoBuddy {
@@ -19,7 +17,7 @@ public class tacoBuddy {
     static public globalFunctions globals;
     static public VariantInfoNameMap VCF_Info_Name_Map;
     static VCFParser the_vcf_parser;
-    static ArrayList<JRSUIConstants.Variant> DOM_var = null, REC_var = null;
+    //static ArrayList<JRSUIConstants.Variant> DOM_var = null, REC_var = null;
 
 
     public static void main(String[] args) throws IOException, ParseException, SQLException {
