@@ -61,6 +61,7 @@ public class Genotype_Feature extends FeatureClass {
             this.genotype_DNA_str = ".";
             this.genotype_INT_str = ".";
         }
+
     }
 
     /*----------------------------------------------------------------------------------------------

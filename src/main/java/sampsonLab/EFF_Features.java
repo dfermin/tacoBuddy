@@ -44,6 +44,8 @@ public class EFF_Features extends FeatureClass {
         protChange = new HashMap<String, String>();
         impactMap = new HashMap<String, Integer>();
 
+        setDataType("EFF", "TEXT");
+
         // this array will contain 1 entry per transcript affected by the variant call
         String[] inputAry = ss.replaceAll("[\\[\\]]+", "").split(",");
 

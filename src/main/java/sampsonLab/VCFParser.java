@@ -74,14 +74,14 @@ public class VCFParser {
 
     /*****************************************************************************************************************/
     // Parse the VCF file, keeping only the variant calls that overlap with the exons of our genes of interest and meet our filtering
-    public void parseByExon(SetMultimap<String, Transcript> geneMap, String filter, String filterType) {
+    public void parseByExon(SetMultimap<String, Transcript> geneMap, String filter, String filterType) throws SQLException {
 
         vcList = new ArrayList<VariantContext>();
 
         // This command only works if you have the tabix tbi file for the input VCF
         VCFFileReader vcfr = new VCFFileReader(inputVCF, inputVCF_tabix);
 
-        int FLANK = 2;
+        int FLANK = 2; // Allow for 2 basepairs of deviation around a variant site
         for(String geneId: geneMap.keySet()) { // Iterate over the genes in the given geneMap
 
             for(Transcript curTS : geneMap.get(geneId)) { // Iterate over the transcripts for this gene
@@ -112,7 +112,7 @@ public class VCFParser {
                         VI.add(vc);
 
 
-                        // Iterate over the features in 'featureSet'
+                        // Iterate over the features in 'globals::featureSet'
                         // Record all of these features for the current 'VI' object
                         for(String s : globalFunctions.featureSet) {
                             if( !VI.fetchFeature(s, vc, curTS.getTranscriptID()) ) {
@@ -121,7 +121,14 @@ public class VCFParser {
                             }
                         }
 
-                        if( VI.passesFilter(filter, curTS.getTranscriptID()) ) { // keep this variant because it met all of our filtering criteria.
+                        // Load each variant into the database object
+//                        tacoBuddy.DB.loadVariant(VI, geneId);
+
+                        // Check to see if this variant passes our filters. If it does, keep it.
+                        if( VI.passesFilter(filter, curTS.getTranscriptID()) ) {
+
+                            // The current variant passed JEXL filtering, now only report it if there is at least one
+                            // sample harboring this variant.
                             if(VI.hasCandidateSubjects(filterType)) {
                                 VI.printSummaryString(geneId, curTS.getTranscriptID());
                             }

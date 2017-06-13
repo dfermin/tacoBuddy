@@ -12,6 +12,8 @@ import java.util.regex.Pattern;
 /**
  * Created by dfermin on 1/5/17.
  */
+
+
 public class VariantInfo {
     public String chr;
     public int pos;
@@ -19,7 +21,7 @@ public class VariantInfo {
     public String ALT;
     public String snp_id;
     public String dbsnp_id;
-    public int allowedSite; // -1 = not allowed, 0 = DOM, 1 = REC
+    public char allowedSite; // possible values: 'D'om, 'R'ec, 'N'ot allowed -1 = not allowed, 0 = DOM, 1 = REC
     public boolean passedFilter;
     public String modelType; // REC or DOM
 
@@ -48,7 +50,7 @@ public class VariantInfo {
         this.svmProb = 0.0;
         this.passedFilter = false;
         this.sample_MAF = -1.0;
-        this.allowedSite = -1;
+        this.allowedSite = 'N';
 
         // construct snp_id string
         snp_id = chr + ":" + String.valueOf(pos);
@@ -64,26 +66,22 @@ public class VariantInfo {
         this.checkAllowedSites();
     }
 
-
     public String getID() { return snp_id; }
     public void setSvmProb(double d) { this.svmProb = d; }
+
 
     /*********************************************************************************************/
     // Function checks to see if this variant is among the variants the user gave in the 'allowedSites' fields of the input file.
     private void checkAllowedSites() {
         String search_str = chr + ":" + String.valueOf(pos);
 
-        // user gave no allowedSites input.
-        if( null == globalFunctions.allowedSitesMap ) {
-            this.allowedSite = -1;
-            return;
-        }
-
-        for(String k : globalFunctions.allowedSitesMap.keySet()) {
-            if(search_str.equalsIgnoreCase(k)) {
-                if(globalFunctions.allowedSitesMap.get(k).equalsIgnoreCase("DOM")) this.allowedSite = 0;
-                else if(globalFunctions.allowedSitesMap.get(k).equalsIgnoreCase("REC")) this.allowedSite = 1;
-                break;
+        if( null != globalFunctions.allowedSitesMap ) {
+            for (String k : globalFunctions.allowedSitesMap.keySet()) {
+                if (search_str.equalsIgnoreCase(k)) {
+                    if (globalFunctions.allowedSitesMap.get(k).equalsIgnoreCase("DOM")) this.allowedSite = 'D';
+                    else if (globalFunctions.allowedSitesMap.get(k).equalsIgnoreCase("REC")) this.allowedSite = 'R';
+                    break;
+                }
             }
         }
     }
@@ -139,9 +137,11 @@ public class VariantInfo {
 
         if(feat.equalsIgnoreCase("EFF")) {
             String tmp = vc.getAttributeAsString("EFF", "#NULL");
+
             if(!tmp.equalsIgnoreCase("#NULL")) {
                 EFF = new EFF_Features(tmp);
                 tmp = transcriptID.replaceAll("\\.\\d+$", "");
+
                 userFeatures.put(feat, EFF.findTS(tmp));
             }
         }
@@ -167,8 +167,12 @@ public class VariantInfo {
 
         boolean retVal = false;
 
+        if(this.snp_id.equalsIgnoreCase("19:36339669")) {
+            int debug = 1;
+        }
+
         // check to see if this current variant is among the sites the user specified as 'allowedSites'
-        if(this.allowedSite > -1) {
+        if(this.allowedSite != 'N') {
             passedFilter = true;
             retVal = true;
         }
@@ -184,7 +188,6 @@ public class VariantInfo {
                 if(EFF.checkEFFimpact(curTS, "HIGH") && (this.sample_MAF < globalFunctions.required_min_sample_maf) ) return true;
             }
 
-//            System.out.println(jexl_filter_str);
 
             JexlEngine jexl = new JexlBuilder().cache(512).strict(true).silent(false).create(); // Create a jexl engine
             JexlExpression expr = jexl.createExpression(jexl_filter_str); // define the expression you want to test/use
@@ -192,9 +195,11 @@ public class VariantInfo {
             // Create a MapContext object and populate it with the variables that are in VariantInfo objects
             JexlContext jc = new MapContext();
 
-            jc.set("SAMPLE_MAF", sample_MAF);
+            jc.set("SAMPLE_MAF", this.sample_MAF);
 
+            // Iterate over the features we might be filtering on
             for(String k : this.userFeatures.keySet()) {
+
                 Object o = this.userFeatures.get(k);
                 String dataType = o.getClass().getSimpleName();
 
@@ -212,6 +217,10 @@ public class VariantInfo {
                 }
 
                 if(dataType.equalsIgnoreCase("Boolean")) {
+                    jc.set(k, o);
+                }
+
+                if(dataType.equalsIgnoreCase("Integer")) {
                     jc.set(k, o);
                 }
             }
@@ -252,7 +261,7 @@ public class VariantInfo {
     public void printSummaryString (String geneId, String transcriptID) {
         int PRECISION = 3;
 
-        if(this.allowedSite != -1) this.modelType += "*";
+        if(this.allowedSite != 'N') this.modelType += "*";
 
         for(String k : this.candPatients) {
             Genotype_Feature gf = genotypeMap.get(k);
@@ -301,7 +310,43 @@ public class VariantInfo {
     }
 
     /*********************************************************************************************/
-    // Function adds the observed genotype information for all the subject for the current variant
+    // Function returns the requested feature field from this variant in the appropriate dataType form
+    // to go into a database.
+    public String getDBformattedFeature(String feat) {
+        String ret = "NULL";
+        if(this.userFeatures.containsKey(feat)) {
+
+            Object o = this.userFeatures.get(feat);
+            String dataType = o.getClass().getSimpleName();
+
+            if(dataType.equalsIgnoreCase("double")) {
+                double d = (Double) o;
+                ret = String.valueOf(d);
+            }
+
+            if(dataType.equalsIgnoreCase("Boolean")) {
+                boolean b = (Boolean) o;
+                if(b) ret = "1";
+                else ret = "0";
+            }
+
+            if(dataType.equalsIgnoreCase("Integer")) {
+                int i = (Integer) o;
+                ret = String.valueOf(i);
+            }
+
+            if(dataType.equalsIgnoreCase("String")) {
+                String s = (String) o;
+                if(s.contains("#NULL")) s = ".";
+                ret = "'" + s + "'";
+            }
+        }
+        return(ret);
+    }
+
+
+    /*********************************************************************************************/
+    // Function adds the observed genotype information for all the subjects for the current variant
     public void add(VariantContext vc) {
 
         ArrayList<String> sampleNames = (ArrayList<String>) vc.getSampleNamesOrderedByName();
@@ -311,7 +356,7 @@ public class VariantInfo {
             genotypeMap.put(s, gf);
         }
 
-        this.calcSampleAF();
+        this.calcSampleAF(); // compute the sample allele frequency now that you have recorded all the samples
     }
 
 
@@ -324,15 +369,29 @@ public class VariantInfo {
 
             if(g.genotype_word.equalsIgnoreCase("#NULL")) continue; // no information for this variant in this sample so skip it.
 
-            // This is a variant that is not in 'allowedSites' and the current subject is homozygous dominant so skip it..
-            if( this.allowedSite < 0 && g.genotype_word.equalsIgnoreCase("HOM") ) continue;
+            // This is a variant that is not in 'allowedSites',
+            // the filter is for dominant variants,
+            // and the current subject is homozygous alternative so skip it..
+            if(
+                this.allowedSite == 'N' &&
+                filterType.equalsIgnoreCase("DOM") &&
+                g.genotype_word.equalsIgnoreCase("HOM_ALT")
+                ) continue;
 
-            // This is a variant in the Dominant 'allowedSites' category but the current subject is homozygous recessive so skip it..
-            if( this.allowedSite == 0 && g.genotype_word.equalsIgnoreCase("HOM_ALT") ) continue;
+            // This is a variant that is not in 'allowedSites',
+            // the filter is for recessive variants,
+            // and the current subject is homozygous reference so skip it..
+            if(
+                this.allowedSite == 'N' &&
+                filterType.equalsIgnoreCase("REC") &&
+                g.genotype_word.equalsIgnoreCase("HOM")
+                ) continue;
 
+            // Only report 'allowedSites' from the Dominant category if the subject NOT HOM_ALT for this variant
+            if( this.allowedSite == 'D' && g.genotype_word.equalsIgnoreCase("HOM_ALT") ) continue;
 
             // Only report 'allowedSites' from the Recessive category if the subject is HOM_ALT for this variant
-            if( this.allowedSite == 1 && !g.genotype_word.equalsIgnoreCase("HOM_ALT") ) continue;
+            if( this.allowedSite == 'R' && !g.genotype_word.equalsIgnoreCase("HOM_ALT") ) continue;
 
             candPatients.add(g.sampleID);
         }
@@ -341,6 +400,8 @@ public class VariantInfo {
 
         return ret;
     }
+
+
 
     /*********************************************************************************************/
     // Function returns the minor allele frequency (MAF) for all the subjects in the VCF file.

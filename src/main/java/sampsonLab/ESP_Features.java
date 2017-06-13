@@ -2,6 +2,7 @@ package sampsonLab;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 
 
 /**
@@ -18,6 +19,9 @@ public class ESP_Features extends FeatureClass {
         ESP_EA_AC = 0;
         ESP_MAF = 0;
         ESP_MAX_AA_EA = 0;
+
+        setDataType("ESP_MAF", "DOUBLE");
+        setDataType("ESP_MAX_AA_EA", "DOUBLE");
     }
 
 

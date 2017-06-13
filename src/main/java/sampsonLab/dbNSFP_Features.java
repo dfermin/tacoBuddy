@@ -8,7 +8,7 @@ import java.util.ArrayList;
  */
 public class dbNSFP_Features extends FeatureClass {
 
-    public  String mutationTaster;
+    public String mutationTaster;
     public String polyphen2_hvar;
     public String SIFT;
     public double GERP__RS;
@@ -18,6 +18,11 @@ public class dbNSFP_Features extends FeatureClass {
         polyphen2_hvar = "#NULL";
         SIFT = "#NULL";
         GERP__RS = Double.NaN;
+
+        setDataType("MUTATIONTASTER", "VARCHAR(50)");
+        setDataType("POLYPHEN2_HVAR", "VARCHAR(50)");
+        setDataType("SIFT", "VARCHAR(50)");
+        setDataType("GERP", "DOUBLE");
     }
 
 

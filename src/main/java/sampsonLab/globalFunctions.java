@@ -32,11 +32,12 @@ public class globalFunctions {
     static public String queryMode = null;
     static public String outputTranscript = null;
     static public double required_min_sample_maf = 0.1;
+    static public boolean doAllGenes = false;
     static public Set<String> genesDOM = null;
     static public Set<String> genesREC = null;
     static public SortedSet<String> featureSet = null;
     static public SetMultimap<String, Transcript> REC_geneMap = null, DOM_geneMap = null, ALL_geneMap = null;
-    static public Map<String, String> allowedSitesMap = null;
+    static public HashMap<String, String> allowedSitesMap = null;
 
 
 
@@ -77,6 +78,9 @@ public class globalFunctions {
         FileReader fr = new FileReader(paramF);
         BufferedReader br = new BufferedReader(fr);
 
+        genesDOM = new HashSet<String>();
+        genesREC = new HashSet<String>();
+
         String line;
         while((line = br.readLine()) != null) {
 
@@ -108,15 +112,13 @@ public class globalFunctions {
             }
 
             if(line.startsWith("genesDOM=")) {
-                genesDOM = new HashSet<String>();
-                String[] tmp = line.substring(9).split("[,\\t;\\s]");
+               String[] tmp = line.substring(9).split("[,\\t;\\s]");
                 for(String s: tmp) {
                     String s2 = s.replaceAll("\\s*", "");
                     if(s2.length() > 1) genesDOM.add(s2);
                 }
             }
             if(line.startsWith("genesREC=")) {
-                genesREC = new HashSet<String>();
                 String[] tmp = line.substring(9).split("[,\\t;\\s]");
                 for(String s: tmp) {
                     String s2 = s.replaceAll("\\s*", "");
@@ -127,7 +129,8 @@ public class globalFunctions {
             if(line.startsWith("transcriptModel=")) {
                 outputTranscript=line.substring(16);
             }
-            if(line.startsWith("TIMS=")) {
+
+            if(line.startsWith("TIMS=")) { // you only need this if the user elects to get the 'most conserved transcript'
                 TIMSfile = new File(line.substring(5));
             }
 
@@ -138,8 +141,9 @@ public class globalFunctions {
                 }
             }
 
+            // Sites to keep and report no matter what their filter scores are
             if(line.startsWith("allowedSites")) {
-                if(null == allowedSitesMap) allowedSitesMap = new HashMap<String, String>();
+                if(null == allowedSitesMap ) allowedSitesMap = new HashMap<String, String>();
 
                 String tmp, tag;
                 tmp = line.split("=")[0];
@@ -147,6 +151,10 @@ public class globalFunctions {
                 else tag = "DOM";
 
                 for(String s : line.substring(16).split("[,;\\s]+")) {
+                    if( allowedSitesMap.containsKey(s) ) {
+                        System.err.println("\nERROR in allowedSites(REC/DOM): You can't have a site be in both the Dominant and the Recessive filters. Pick one.\n\n");
+                        System.exit(0);
+                    }
                     allowedSitesMap.put(s, tag);
                 }
             }
@@ -157,8 +165,6 @@ public class globalFunctions {
         }
         br.close();
 
-
-        //recordVCFinfoFields();
         errorCheck_paramFile_input();
 
 
@@ -172,20 +178,23 @@ public class globalFunctions {
         System.err.print("Transcript model: " + outputTranscript + "\n");
         if( outputTranscript.equalsIgnoreCase("mostConserved") ) System.err.print("TIMS file:    " + TIMSfile.getName() + "\n");
 
-        if( (genesDOM.size() == 0) && (genesREC.size() == 0) ) {
+        if(null != ALL_geneMap) {
             System.err.print("Processing all genes in:  " + srcGFF3.getName() + "\n");
         }
         else {
-            if (genesDOM.size() > 0) System.err.print("DOM genes:    " + genesDOM + "\n");
-            if (genesREC.size() > 0) System.err.print("REC genes:    " + genesREC + "\n");
+            if (!genesDOM.isEmpty()) System.err.print("\nDOM genes:    " + genesDOM + "\n");
+            if (!genesREC.isEmpty()) System.err.print("\nREC genes:    " + genesREC + "\n");
         }
-        if (filterDOM != null) System.err.print("DOM filters:  " + filterDOM + "\n");
-        if (filterREC != null) System.err.print("REC filters:  " + filterREC + "\n");
+
+        if (filterDOM != null && !genesDOM.isEmpty() ) System.err.print("\nDOM filters:  " + filterDOM + "\n");
+        if (filterREC != null && !genesREC.isEmpty() ) System.err.print("\nREC filters:  " + filterREC + "\n");
         System.err.print("Selected output features: " + Joiner.on(", ").join(featureSet) + "\n");
 
         if( !(null == allowedSitesMap) && (allowedSitesMap.size() > 0) ) {
             System.err.print("Requested sites:\n");
-            for(String k : allowedSitesMap.keySet()) { System.err.println("  " + allowedSitesMap.get(k) + "\t" + k); }
+            for(String k : allowedSitesMap.keySet()) {
+                System.err.println("  " + allowedSitesMap.get(k) + "\t" + k);
+            }
         }
         System.err.print("-------------------------------------------------------------\n\n");
     }
@@ -233,9 +242,15 @@ public class globalFunctions {
         }
 
 
+        // If the user has not specified any DOM or REC genes then initialize ALL_geneMap
         score = 0;
-        if( genesDOM.size() > 0 ) score++;
-        if( genesREC.size() > 0 ) score++;
+        if( (null != genesDOM) && (genesDOM.size() > 0) ) score++;
+        if( (null != genesREC) && (genesREC.size() > 0) ) score++;
+        if(score == 0) {
+            ALL_geneMap = HashMultimap.create();
+            doAllGenes = true;
+        }
+
 
         score = 0;
         if( (null != filterDOM) && (filterDOM.length() > 0) ) score++;
@@ -288,9 +303,9 @@ public class globalFunctions {
             cleanBits.add(b);
         }
 
-        // Got through cleanBits and make sure they are in the final output feature list
+        // Go through cleanBits and make sure they are in the final output feature list
         for(String b : cleanBits) {
-            if( !featureSet.contains(b) ) featureSet.add(b);
+            if( !featureSet.contains(b.toUpperCase()) ) featureSet.add(b);
         }
     }
 
@@ -372,7 +387,7 @@ public class globalFunctions {
                       "\n# Numerical filters are written as 'filter_field' <= 'numeric_cutoff' " +
                       "\n# Some default filters are given below as examples of proper syntax usage.\n");
         bw.write("\n# Score filters to apply to the variants in DOMINANT genes\nfilterDOM=SAMPLE_MAF < 0.1 and (ESP_MAX_AA_EA < 0.005 and (( (POLYPHEN2_HVAR =~ 'D') + /['AD'] =~ MUTATIONTASTER/ + (SIFT =~ 'D')) >= 2)) or (ESP_MAX_AA_EA < 0.005 and IS_LOF)\n\n");
-        bw.write("\n# Score filters to apply to the variants in RECESSIVE genes\nfilterREC=SAMPLE_MAF < 0.1 and (ESP_MAX_AA_EA < 0.01 and (( (POLYPHEN2_HVAR =~ 'D') + /['AD'] =~ MUTATIONTASTER/ + (SIFT == 'D')) >= 2)) or (ESP_MAX_AA_EA < 0.01 and IS_LOF)\n\n");
+        bw.write("\n# Score filters to apply to the variants in RECESSIVE genes\nfilterREC=SAMPLE_MAF < 0.1 and (ESP_MAX_AA_EA < 0.01 and (( (POLYPHEN2_HVAR =~ 'D') + /['AD'] =~ MUTATIONTASTER/ + (SIFT =~ 'D')) >= 2)) or (ESP_MAX_AA_EA < 0.01 and IS_LOF)\n\n");
         bw.write("\n# Include data for these variants regardless of their filter scores\n" +
                 "# Variant syntax: chromosome:position\n" +
                 "# Multiple sites can be given as comma separated.\n#allowedSitesDOM=\n#allowedSitesREC=\n");
@@ -392,13 +407,13 @@ public class globalFunctions {
     /*----------------------------------------------------------------------------------------------------------------*/
     public void parseGFF3() throws IOException {
 
-        if(this.genesREC.size() > 0) REC_geneMap = HashMultimap.create(); // k = geneName, v = list of transcripts
-        if(this.genesDOM.size() > 0) DOM_geneMap = HashMultimap.create(); // k = geneName, v = list of transcripts
+        if( !doAllGenes ) {
+            if (this.genesREC.size() > 0) REC_geneMap = HashMultimap.create(); // k = geneName, v = list of transcripts
+            if (this.genesDOM.size() > 0) DOM_geneMap = HashMultimap.create(); // k = geneName, v = list of transcripts
+        }
 
-        if( (this.genesDOM.size() == 0) && (this.genesREC.size() == 0)) ALL_geneMap = HashMultimap.create();
 
         BufferedReader br = null;
-
         System.err.print("\nParsing " + srcGFF3.getName() + "\n");
 
         if(srcGFF3.getName().endsWith(".gz")) {
@@ -503,9 +518,11 @@ public class globalFunctions {
         }
         br.close();
 
-        if(this.genesDOM.size() > 0) System.err.println("DOM gene map size: " + DOM_geneMap.asMap().size());
-        if(this.genesREC.size() > 0) System.err.println("REC gene map size: " + REC_geneMap.asMap().size());
-        if( (null != this.ALL_geneMap) && (this.ALL_geneMap.asMap().size() > 0)) System.err.println("Gene map size: " + ALL_geneMap.asMap().size());
+        if(doAllGenes) System.err.println("Gene map size: " + ALL_geneMap.asMap().size());
+        else {
+            if (this.genesDOM.size() > 0) System.err.println("DOM gene map size: " + DOM_geneMap.asMap().size());
+            if (this.genesREC.size() > 0) System.err.println("REC gene map size: " + REC_geneMap.asMap().size());
+        }
     }
 
 
@@ -525,72 +542,107 @@ public class globalFunctions {
             double lowest_tims;
             gene2transMap = new HashMap<String, Transcript>();
 
-            // Iterate over all the genes in DOM_geneMap
-            // Keep the transcript with the *LOWEST* tims score
-            for(String gene : DOM_geneMap.keys()) {
-                lowest_tims = 10000;
-                best_TS = null;
-
-                for(Transcript ts: DOM_geneMap.get(gene)) {
-                    if (ts.getTims() < lowest_tims) {
-                        lowest_tims = ts.getTims();
-                        best_TS = ts;
-                    }
-                }
-
-                if(lowest_tims < 10000) { // we found at least 1 transcript with a low TIMS score
-                    gene2transMap.put(gene, best_TS);
-                }
-                else { // all of the transcripts have the same TIMS score so keep the longest transcript
-                    int tsLen = 0;
+            if(doAllGenes) {
+                // iterate over all the genes in ALL_geneMap
+                // Keep the transcript with the *LOWEST* tims score
+                for (String gene : ALL_geneMap.keys()) {
+                    lowest_tims = 10000;
                     best_TS = null;
-                    for(Transcript k: DOM_geneMap.get(gene) ) {
-                        if(k.getTsLen() > tsLen) {
-                            tsLen = k.getTsLen();
-                            best_TS = k;
+
+                    for (Transcript ts : ALL_geneMap.get(gene)) {
+                        if (ts.getTims() < lowest_tims) {
+                            lowest_tims = ts.getTims();
+                            best_TS = ts;
                         }
                     }
-                    gene2transMap.put(gene, best_TS);
-                }
-            }
-            DOM_geneMap.clear();
-            for(String k : gene2transMap.keySet()) DOM_geneMap.put(k, gene2transMap.get(k));
-            gene2transMap.clear();
 
-
-            // Iterate over all the genes in REC_geneMap
-            // Keep the transcript with the *LOWEST* tims score
-            for(String gene : REC_geneMap.keys()) {
-                lowest_tims = 10000;
-                best_TS = null;
-
-                for(Transcript ts: REC_geneMap.get(gene)) {
-                    if (ts.getTims() < lowest_tims) {
-                        lowest_tims = ts.getTims();
-                        best_TS = ts;
+                    if (lowest_tims < 10000) { // we found at least 1 transcript with a low TIMS score
+                        gene2transMap.put(gene, best_TS);
+                    } else { // all of the transcripts have the same TIMS score so keep the longest transcript
+                        int tsLen = 0;
+                        best_TS = null;
+                        for (Transcript k : ALL_geneMap.get(gene)) {
+                            if (k.getTsLen() > tsLen) {
+                                tsLen = k.getTsLen();
+                                best_TS = k;
+                            }
+                        }
+                        gene2transMap.put(gene, best_TS);
                     }
                 }
-
-                if(lowest_tims < 10000) {
-                    gene2transMap.put(gene, best_TS);
-                }
-                else { // all of the transcripts have the same TIMS score so keep the longest transcript
-                    int tsLen = 0;
+                ALL_geneMap.clear();
+                for (String k : gene2transMap.keySet()) ALL_geneMap.put(k, gene2transMap.get(k));
+                gene2transMap.clear();
+            }
+            else {
+                // Iterate over all the genes in DOM_geneMap
+                // Keep the transcript with the *LOWEST* tims score
+                for (String gene : DOM_geneMap.keys()) {
+                    lowest_tims = 10000;
                     best_TS = null;
-                    for(Transcript k: REC_geneMap.get(gene) ) {
-                        if(k.getTsLen() > tsLen) {
-                            tsLen = k.getTsLen();
-                            best_TS = k;
+
+                    for (Transcript ts : DOM_geneMap.get(gene)) {
+                        if (ts.getTims() < lowest_tims) {
+                            lowest_tims = ts.getTims();
+                            best_TS = ts;
                         }
                     }
-                    gene2transMap.put(gene, best_TS);
+
+                    if (lowest_tims < 10000) { // we found at least 1 transcript with a low TIMS score
+                        gene2transMap.put(gene, best_TS);
+                    } else { // all of the transcripts have the same TIMS score so keep the longest transcript
+                        int tsLen = 0;
+                        best_TS = null;
+                        for (Transcript k : DOM_geneMap.get(gene)) {
+                            if (k.getTsLen() > tsLen) {
+                                tsLen = k.getTsLen();
+                                best_TS = k;
+                            }
+                        }
+                        gene2transMap.put(gene, best_TS);
+                    }
                 }
-            }
-            REC_geneMap.clear();
-            for(String k : gene2transMap.keySet()) REC_geneMap.put(k, gene2transMap.get(k));
-            gene2transMap.clear();
+                DOM_geneMap.clear();
+                for (String k : gene2transMap.keySet()) DOM_geneMap.put(k, gene2transMap.get(k));
+                gene2transMap.clear();
+
+
+                // Iterate over all the genes in REC_geneMap
+                // Keep the transcript with the *LOWEST* tims score
+                for (String gene : REC_geneMap.keys()) {
+                    lowest_tims = 10000;
+                    best_TS = null;
+
+                    for (Transcript ts : REC_geneMap.get(gene)) {
+                        if (ts.getTims() < lowest_tims) {
+                            lowest_tims = ts.getTims();
+                            best_TS = ts;
+                        }
+                    }
+
+                    if (lowest_tims < 10000) {
+                        gene2transMap.put(gene, best_TS);
+                    } else { // all of the transcripts have the same TIMS score so keep the longest transcript
+                        int tsLen = 0;
+                        best_TS = null;
+                        for (Transcript k : REC_geneMap.get(gene)) {
+                            if (k.getTsLen() > tsLen) {
+                                tsLen = k.getTsLen();
+                                best_TS = k;
+                            }
+                        }
+                        gene2transMap.put(gene, best_TS);
+                    }
+                }
+                REC_geneMap.clear();
+                for (String k : gene2transMap.keySet()) REC_geneMap.put(k, gene2transMap.get(k));
+                gene2transMap.clear();
+
+            } // end else
 
         } //-------------- End if over outputTranscript == mostConserved ------------------------
+
+
 
 
         if(outputTranscript.equalsIgnoreCase("longest")) {
@@ -599,7 +651,7 @@ public class globalFunctions {
 
             gene2transMap = new HashMap<String, Transcript>();
 
-            if(null != ALL_geneMap) {
+            if(doAllGenes) {
                 for (String gene : ALL_geneMap.keys()) {
                     tsLen = 0;
                     best_TS = null;
@@ -615,43 +667,43 @@ public class globalFunctions {
                 for (String k : gene2transMap.keySet()) ALL_geneMap.put(k, gene2transMap.get(k));
                 gene2transMap.clear();
             }
-
-
-            if(null != DOM_geneMap) {
-                for (String gene : DOM_geneMap.keys()) {
-                    tsLen = 0;
-                    best_TS = null;
-                    for (Transcript ts : DOM_geneMap.get(gene)) {
-                        if (ts.getTsLen() > tsLen) {
-                            tsLen = ts.getTsLen();
-                            best_TS = ts;
+            else {
+                if (null != DOM_geneMap) {
+                    for (String gene : DOM_geneMap.keys()) {
+                        tsLen = 0;
+                        best_TS = null;
+                        for (Transcript ts : DOM_geneMap.get(gene)) {
+                            if (ts.getTsLen() > tsLen) {
+                                tsLen = ts.getTsLen();
+                                best_TS = ts;
+                            }
                         }
+                        gene2transMap.put(gene, best_TS);
                     }
-                    gene2transMap.put(gene, best_TS);
+                    DOM_geneMap.clear();
+                    for (String k : gene2transMap.keySet()) DOM_geneMap.put(k, gene2transMap.get(k));
+                    gene2transMap.clear();
                 }
-                DOM_geneMap.clear();
-                for (String k : gene2transMap.keySet()) DOM_geneMap.put(k, gene2transMap.get(k));
-                gene2transMap.clear();
-            }
 
 
-            if(null != REC_geneMap) {
-                for (String gene : REC_geneMap.keys()) {
-                    tsLen = 0;
-                    best_TS = null;
-                    for (Transcript ts : REC_geneMap.get(gene)) {
-                        if (ts.getTsLen() > tsLen) {
-                            tsLen = ts.getTsLen();
-                            best_TS = ts;
+                if (null != REC_geneMap) {
+                    for (String gene : REC_geneMap.keys()) {
+                        tsLen = 0;
+                        best_TS = null;
+                        for (Transcript ts : REC_geneMap.get(gene)) {
+                            if (ts.getTsLen() > tsLen) {
+                                tsLen = ts.getTsLen();
+                                best_TS = ts;
+                            }
                         }
+                        gene2transMap.put(gene, best_TS);
                     }
-                    gene2transMap.put(gene, best_TS);
+                    REC_geneMap.clear();
+                    for (String k : gene2transMap.keySet()) REC_geneMap.put(k, gene2transMap.get(k));
+                    gene2transMap.clear();
                 }
-                REC_geneMap.clear();
-                for (String k : gene2transMap.keySet()) REC_geneMap.put(k, gene2transMap.get(k));
-                gene2transMap.clear();
-            }
-        }
+            } // end else
+        } // end longest transcript
     }
 
     /*------------------------------------------------------------------------------------------------------------------

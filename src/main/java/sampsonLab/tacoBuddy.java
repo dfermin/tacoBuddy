@@ -17,15 +17,13 @@ public class tacoBuddy {
     static public globalFunctions globals;
     static public VariantInfoNameMap VCF_Info_Name_Map;
     static VCFParser the_vcf_parser;
-    //static ArrayList<JRSUIConstants.Variant> DOM_var = null, REC_var = null;
-
+    //static vcfDB DB = null;
 
     public static void main(String[] args) throws IOException, ParseException, SQLException {
 
         // Prepare the globals object to handle user input
         globals = new globalFunctions();
         VCF_Info_Name_Map = new VariantInfoNameMap();
-
 
         if( args.length < 1 ) {
             System.err.print("\nUSAGE: java -jar tacoBuddy.jar -i <input_file> or -t or -L <vcf.gz>\n" +
@@ -39,6 +37,10 @@ public class tacoBuddy {
         globals.selectTranscriptModel();
 
         the_vcf_parser = new VCFParser(globals.inputVCF, globals.inputVCF_tabix);
+
+        //DB = new vcfDB(false);
+        //DB.createVCF(globals.featureSet);
+
 
         if(globals.featureSet.contains("EFF")) {
             double x = globals.required_min_sample_maf * 100;
@@ -59,21 +61,18 @@ public class tacoBuddy {
 
             for(String geneType :  new String[] { "DOM", "REC"}) {
 
-                if(geneType.equalsIgnoreCase("DOM")) {
-                    if(globals.genesDOM.size() > 0)
-                        the_vcf_parser.parseByExon(globals.DOM_geneMap, globals.filterDOM, geneType);
-                    else if(globals.ALL_geneMap.asMap().size() > 0)
-                        the_vcf_parser.parseByExon(globals.ALL_geneMap, globals.filterDOM, geneType);
+                if (geneType.equalsIgnoreCase("DOM")) {
+                    if (globals.doAllGenes) the_vcf_parser.parseByExon(globals.ALL_geneMap, globals.filterDOM, geneType);
+                    else the_vcf_parser.parseByExon(globals.DOM_geneMap, globals.filterDOM, geneType);
                 }
 
-                if(geneType.equalsIgnoreCase("REC"))
-                    if(globals.genesREC.size() > 0)
-                        the_vcf_parser.parseByExon(globals.REC_geneMap, globals.filterREC, geneType);
-                    else if(globals.ALL_geneMap.asMap().size() > 0)
-                        the_vcf_parser.parseByExon(globals.ALL_geneMap, globals.filterREC, geneType);
-
+                if (geneType.equalsIgnoreCase("REC")) {
+                    if (globals.doAllGenes) the_vcf_parser.parseByExon(globals.ALL_geneMap, globals.filterREC, geneType);
+                    else the_vcf_parser.parseByExon(globals.REC_geneMap, globals.filterREC, geneType);
+                }
             }
         }
+
 
         // Record any variants that land within the transcripts of the genes stored in DOM and REC maps
         if(globals.queryMode.equalsIgnoreCase("transcript")) {
@@ -81,18 +80,14 @@ public class tacoBuddy {
             for(String geneType :  new String[] { "DOM", "REC"}) {
 
                 if(geneType.equalsIgnoreCase("DOM")) {
-                    if(globals.genesDOM.size() > 0)
-                        the_vcf_parser.parseByTranscript(globals.DOM_geneMap, globals.filterDOM, geneType);
-                    else if(globals.ALL_geneMap.asMap().size() > 0)
-                        the_vcf_parser.parseByTranscript(globals.ALL_geneMap, globals.filterDOM, geneType);
+                    if (globals.doAllGenes) the_vcf_parser.parseByTranscript(globals.ALL_geneMap, globals.filterDOM, geneType);
+                    else the_vcf_parser.parseByTranscript(globals.DOM_geneMap, globals.filterDOM, geneType);
                 }
 
-                if(geneType.equalsIgnoreCase("REC"))
-                    if(globals.genesREC.size() > 0)
-                        the_vcf_parser.parseByTranscript(globals.REC_geneMap, globals.filterREC, geneType);
-                    else if(globals.ALL_geneMap.asMap().size() > 0)
-                        the_vcf_parser.parseByTranscript(globals.ALL_geneMap, globals.filterREC, geneType);
-
+                if(geneType.equalsIgnoreCase("REC")) {
+                    if (globals.doAllGenes) the_vcf_parser.parseByTranscript(globals.ALL_geneMap, globals.filterREC, geneType);
+                    else the_vcf_parser.parseByTranscript(globals.REC_geneMap, globals.filterREC, geneType);
+                }
             }
         }
     }
