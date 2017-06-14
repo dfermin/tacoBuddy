@@ -21,7 +21,7 @@ public class VariantInfo {
     public String ALT;
     public String snp_id;
     public String dbsnp_id;
-    public char allowedSite; // possible values: 'D'om, 'R'ec, 'N'ot allowed -1 = not allowed, 0 = DOM, 1 = REC
+    public boolean allowedSite; // true means that this site bypasses all filters
     public boolean passedFilter;
     public String modelType; // REC or DOM
 
@@ -50,7 +50,7 @@ public class VariantInfo {
         this.svmProb = 0.0;
         this.passedFilter = false;
         this.sample_MAF = -1.0;
-        this.allowedSite = 'N';
+        this.allowedSite = false;
 
         // construct snp_id string
         snp_id = chr + ":" + String.valueOf(pos);
@@ -75,14 +75,8 @@ public class VariantInfo {
     private void checkAllowedSites() {
         String search_str = chr + ":" + String.valueOf(pos);
 
-        if( null != globalFunctions.allowedSitesMap ) {
-            for (String k : globalFunctions.allowedSitesMap.keySet()) {
-                if (search_str.equalsIgnoreCase(k)) {
-                    if (globalFunctions.allowedSitesMap.get(k).equalsIgnoreCase("DOM")) this.allowedSite = 'D';
-                    else if (globalFunctions.allowedSitesMap.get(k).equalsIgnoreCase("REC")) this.allowedSite = 'R';
-                    break;
-                }
-            }
+        if( null != globalFunctions.allowedSites ) {
+            if( globalFunctions.allowedSites.contains(search_str)) this.allowedSite = true;
         }
     }
 
@@ -163,16 +157,19 @@ public class VariantInfo {
     /*********************************************************************************************/
     // Function applies the user's filter to this variant. Calling this function assumes VariantInfo::fetchFeature()
     // ran successfully.
-    public boolean passesFilter(String jexl_filter_str, String curTS) {
+    public void passesFilter(String jexl_filter_str, String curTS) {
 
         boolean retVal = false;
 
-        if(this.snp_id.equalsIgnoreCase("19:36339669")) {
-            int debug = 1;
+        // if you don't give the program a filter string, all variants will pass
+        if( (null == jexl_filter_str) || (jexl_filter_str.length() == 0) ) {
+            passedFilter = true;
+            return;
         }
 
+
         // check to see if this current variant is among the sites the user specified as 'allowedSites'
-        if(this.allowedSite != 'N') {
+        if(this.allowedSite) {
             passedFilter = true;
             retVal = true;
         }
@@ -181,11 +178,17 @@ public class VariantInfo {
             if(this.userFeatures.containsKey("EFF")) {
 
                 // Quick check to see if this is a synonymous mutation. If it is, automatically fail it
-                if(EFF.isSynonymousVariant(curTS)) return  false;
+                if(EFF.isSynonymousVariant(curTS)) {
+                    passedFilter = false;
+                    return;
+                }
 
                 // Check to see if this is a high-impact mutation
                 // Keep any high-impact mutations that have a minor allele frequency < req_min_sample_maf in our VCF file
-                if(EFF.checkEFFimpact(curTS, "HIGH") && (this.sample_MAF < globalFunctions.required_min_sample_maf) ) return true;
+                if(EFF.checkEFFimpact(curTS, "HIGH") && (this.sample_MAF < globalFunctions.required_min_sample_maf) ) {
+                    passedFilter = false;
+                    return;
+                }
             }
 
 
@@ -229,8 +232,6 @@ public class VariantInfo {
 
             if (retVal) passedFilter = true;
         }
-
-        return retVal;
     }
 
 
@@ -261,7 +262,10 @@ public class VariantInfo {
     public void printSummaryString (String geneId, String transcriptID) {
         int PRECISION = 3;
 
-        if(this.allowedSite != 'N') this.modelType += "*";
+        if(this.allowedSite) this.modelType += "*";
+
+        // This Variant did not pass the jexl filter and is not an allowed site so don't report it
+//        if( !this.allowedSite && !this.passedFilter ) return;
 
         for(String k : this.candPatients) {
             Genotype_Feature gf = genotypeMap.get(k);
@@ -369,29 +373,18 @@ public class VariantInfo {
 
             if(g.genotype_word.equalsIgnoreCase("#NULL")) continue; // no information for this variant in this sample so skip it.
 
-            // This is a variant that is not in 'allowedSites',
-            // the filter is for dominant variants,
+            // The filter is for dominant variants,
             // and the current subject is homozygous alternative so skip it..
-            if(
-                this.allowedSite == 'N' &&
-                filterType.equalsIgnoreCase("DOM") &&
-                g.genotype_word.equalsIgnoreCase("HOM_ALT")
-                ) continue;
+            if(filterType.equalsIgnoreCase("DOM") && g.genotype_word.equalsIgnoreCase("HOM_ALT")) continue;
 
-            // This is a variant that is not in 'allowedSites',
-            // the filter is for recessive variants,
-            // and the current subject is homozygous reference so skip it..
-            if(
-                this.allowedSite == 'N' &&
-                filterType.equalsIgnoreCase("REC") &&
-                g.genotype_word.equalsIgnoreCase("HOM")
-                ) continue;
+            // The filter is for recessive variants,
+            // and the current subject is NOT homozygous alternative so skip it..
+            if(!this.allowedSite && filterType.equalsIgnoreCase("REC") && !g.genotype_word.equalsIgnoreCase("HOM_ALT")) continue;
 
-            // Only report 'allowedSites' from the Dominant category if the subject NOT HOM_ALT for this variant
-            if( this.allowedSite == 'D' && g.genotype_word.equalsIgnoreCase("HOM_ALT") ) continue;
-
-            // Only report 'allowedSites' from the Recessive category if the subject is HOM_ALT for this variant
-            if( this.allowedSite == 'R' && !g.genotype_word.equalsIgnoreCase("HOM_ALT") ) continue;
+            // This is an allowed site
+            // The filter is for recessive variants
+            // The current subject is homozygous reference we skip it.
+            if(this.allowedSite && filterType.equalsIgnoreCase("REC") && g.genotype_word.equalsIgnoreCase("HOM")) continue;
 
             candPatients.add(g.sampleID);
         }

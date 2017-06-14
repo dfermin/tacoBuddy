@@ -37,7 +37,7 @@ public class globalFunctions {
     static public Set<String> genesREC = null;
     static public SortedSet<String> featureSet = null;
     static public SetMultimap<String, Transcript> REC_geneMap = null, DOM_geneMap = null, ALL_geneMap = null;
-    static public HashMap<String, String> allowedSitesMap = null;
+    static public SortedSet<String> allowedSites = null;
 
 
 
@@ -143,24 +143,12 @@ public class globalFunctions {
 
             // Sites to keep and report no matter what their filter scores are
             if(line.startsWith("allowedSites")) {
-                if(null == allowedSitesMap ) allowedSitesMap = new HashMap<String, String>();
-
-                String tmp, tag;
-                tmp = line.split("=")[0];
-                if(tmp.endsWith("REC")) tag = "REC";
-                else tag = "DOM";
-
-                for(String s : line.substring(16).split("[,;\\s]+")) {
-                    if( allowedSitesMap.containsKey(s) ) {
-                        System.err.println("\nERROR in allowedSites(REC/DOM): You can't have a site be in both the Dominant and the Recessive filters. Pick one.\n\n");
-                        System.exit(0);
-                    }
-                    allowedSitesMap.put(s, tag);
-                }
+                if(null == allowedSites ) allowedSites = new TreeSet<String>();
+                for(String s : line.substring(13).split("[,;\\s]+")) allowedSites.add(s);
             }
 
-            if(line.startsWith("filterDOM=")) filterDOM = reformat_filter(line.substring(10));
-            if(line.startsWith("filterREC=")) filterREC = reformat_filter(line.substring(10));
+            if(line.startsWith("filterDOM=")) filterDOM = line.substring(10);
+            if(line.startsWith("filterREC=")) filterREC = line.substring(10);
 
         }
         br.close();
@@ -190,10 +178,10 @@ public class globalFunctions {
         if (filterREC != null && !genesREC.isEmpty() ) System.err.print("\nREC filters:  " + filterREC + "\n");
         System.err.print("Selected output features: " + Joiner.on(", ").join(featureSet) + "\n");
 
-        if( !(null == allowedSitesMap) && (allowedSitesMap.size() > 0) ) {
+        if( !(null == allowedSites) && (allowedSites.size() > 0) ) {
             System.err.print("Requested sites:\n");
-            for(String k : allowedSitesMap.keySet()) {
-                System.err.println("  " + allowedSitesMap.get(k) + "\t" + k);
+            for(String k : allowedSites) {
+                System.err.println("\t" + k);
             }
         }
         System.err.print("-------------------------------------------------------------\n\n");
@@ -286,7 +274,9 @@ public class globalFunctions {
             for(String p2 : parts2) {
 
                 if(Pattern.matches("^[\\d\\.-]+$", p2)) continue; // just a number
+                if(p2.contains("[") || p2.contains("]") ) continue; // a regex box
                 if(p2.length() < 3) continue;
+                if(p2.equalsIgnoreCase("sample_maf")) continue; // this is added automatically
                 bits.add(p2);
             }
         }
@@ -312,52 +302,52 @@ public class globalFunctions {
     /*----------------------------------------------------------------------------------------------------------------*/
     // Function reformats the user filter to make sure it will work with jexl
     // Specifically it converts: /[AD] =~ SIFT/ to ('A' =~ SIFT) or ('D' =~ SIFT)
-    private static String reformat_filter(String origFilter) {
-        String ret = "";
-        if(!origFilter.contains("/")) ret = origFilter;
-        else {
-            ArrayList<String> AL = new ArrayList<String>();
-            ArrayList<Integer> slashPos = new ArrayList<Integer>();
-            for(int i = 0; i < origFilter.length(); i++) {
-                if(origFilter.charAt(i) == '/') slashPos.add(i);
-            }
-
-            // slashPos must have an even number of entries since the '/' always comes as a pair
-            for(int i = 0; i < slashPos.size() - 1; i += 2) {
-                int j = i + 1;
-                String tmp = origFilter.substring(slashPos.get(i)+1, slashPos.get(j));
-                AL.add(tmp);
-            }
-
-            // AL now contains every instance of a perl-like or regex (example: ['ABCD'] =~ blah)
-            // Reformat each one to be in compliance with the jexl api
-            HashMap<String, String> jexlMap = new HashMap<String, String>();
-            String tmp = "";
-            for(String s : AL) {
-                String key = s;
-                s = s.trim().replaceAll("\\[", "").replaceAll("\\]", "").replaceAll("'", ""); // strip out []'
-                int i = s.indexOf("=~");
-
-                String comparison_suffix = s.substring(i).trim();
-                String pattern = s.substring(0,i).trim();
-
-                ArrayList<String> Jarray = new ArrayList<String>();
-                for(String k : pattern.split("")) {
-                    tmp = "('" + k + "' " + comparison_suffix + ")";
-                    Jarray.add(tmp);
-                }
-                tmp = "(" + Joiner.on(" or ").join(Jarray) + ")";
-                jexlMap.put(key, tmp); // k = original string, v = jexl compliant string
-            }
-
-            // Now replace the regex values in origFilter with the new values we've created in jexlMap
-            ret = origFilter.replaceAll("/", "");
-            for(String k : jexlMap.keySet()) {
-                ret = ret.replace(k, jexlMap.get(k));
-            }
-        }
-        return ret;
-    }
+//    private static String reformat_filter(String origFilter) {
+//        String ret = "";
+//        if(!origFilter.contains("/")) ret = origFilter;
+//        else {
+//            ArrayList<String> AL = new ArrayList<String>();
+//            ArrayList<Integer> slashPos = new ArrayList<Integer>();
+//            for(int i = 0; i < origFilter.length(); i++) {
+//                if(origFilter.charAt(i) == '/') slashPos.add(i);
+//            }
+//
+//            // slashPos must have an even number of entries since the '/' always comes as a pair
+//            for(int i = 0; i < slashPos.size() - 1; i += 2) {
+//                int j = i + 1;
+//                String tmp = origFilter.substring(slashPos.get(i)+1, slashPos.get(j));
+//                AL.add(tmp);
+//            }
+//
+//            // AL now contains every instance of a perl-like or regex (example: ['ABCD'] =~ blah)
+//            // Reformat each one to be in compliance with the jexl api
+//            HashMap<String, String> jexlMap = new HashMap<String, String>();
+//            String tmp = "";
+//            for(String s : AL) {
+//                String key = s;
+//                s = s.trim().replaceAll("\\[", "").replaceAll("\\]", "").replaceAll("'", ""); // strip out []'
+//                int i = s.indexOf("=~");
+//
+//                String comparison_suffix = s.substring(i).trim();
+//                String pattern = s.substring(0,i).trim();
+//
+//                ArrayList<String> Jarray = new ArrayList<String>();
+//                for(String k : pattern.split("")) {
+//                    tmp = "('" + k + "' " + comparison_suffix + ")";
+//                    Jarray.add(tmp);
+//                }
+//                tmp = "(" + Joiner.on(" or ").join(Jarray) + ")";
+//                jexlMap.put(key, tmp); // k = original string, v = jexl compliant string
+//            }
+//
+//            // Now replace the regex values in origFilter with the new values we've created in jexlMap
+//            ret = origFilter.replaceAll("/", "");
+//            for(String k : jexlMap.keySet()) {
+//                ret = ret.replace(k, jexlMap.get(k));
+//            }
+//        }
+//        return ret;
+//    }
 
 
     /*----------------------------------------------------------------------------------------------------------------*/
@@ -375,22 +365,31 @@ public class globalFunctions {
         bw.write("\n# Specify the minimum Sample minor allele frequecy (MAF) that a variant call must have in order to be reported\nmin_sample_maf=0.05");
         bw.write("\n# Specify query method for reporting variant calls." +
                       "\n# 'transcript' = look for variants within the boundaries of a transcript" +
-                      "\n# 'exon' = look for variants within the coding boundaries of exons\n" +
-                      "queryMode=transcript\n");
-        bw.write("\n# List the variant information (ie: features) in the VCF file you want to report in the final output.\n" +
-                        "# NOTE: This list _MUST_ contain all of the field names you use in 'filterDOM' and filterREC' below.\n" +
-                        "# The entries here can be separated by tabs, spaces, commas or semicolons\n" +
-                        "featureList=EFF\n");
+                      "\n# 'exon' = look for variants within the coding boundaries of exons" +
+                      "\nqueryMode=transcript\n");
+
+        bw.write("\n# List the variant information (ie: features) in the VCF file you want to report in the final output." +
+                      "\n# NOTE: This list _MUST_ contain all of the field names you use in 'filterDOM' and filterREC' below." +
+                      "\n# The entries here can be separated by tabs, spaces, commas or semicolons" +
+                      "\nfeatureList=EFF\n");
+
         bw.write("\n# Enter regex-like filters there for genes. " +
-                      "\n# The syntax is **CRITICAL** here. You must write your text-based expressions as: 'query_term' =~ 'filter_field' " +
-                      "\n# For 'or' conditions surround the whole regex in forward slashes. Example: /['DT'] =~ SIFT/" +
+                      "\n# The syntax is **CRITICAL** here!" +
+                      "\n# You must write your text-based expressions as: 'query_term' =~ 'filter_field' " +
                       "\n# Numerical filters are written as 'filter_field' <= 'numeric_cutoff' " +
-                      "\n# Some default filters are given below as examples of proper syntax usage.\n");
-        bw.write("\n# Score filters to apply to the variants in DOMINANT genes\nfilterDOM=SAMPLE_MAF < 0.1 and (ESP_MAX_AA_EA < 0.005 and (( (POLYPHEN2_HVAR =~ 'D') + /['AD'] =~ MUTATIONTASTER/ + (SIFT =~ 'D')) >= 2)) or (ESP_MAX_AA_EA < 0.005 and IS_LOF)\n\n");
-        bw.write("\n# Score filters to apply to the variants in RECESSIVE genes\nfilterREC=SAMPLE_MAF < 0.1 and (ESP_MAX_AA_EA < 0.01 and (( (POLYPHEN2_HVAR =~ 'D') + /['AD'] =~ MUTATIONTASTER/ + (SIFT =~ 'D')) >= 2)) or (ESP_MAX_AA_EA < 0.01 and IS_LOF)\n\n");
+                      "\n# Some default filters are given below as examples of proper syntax usage." +
+                      "\n# These examples assume that dbNSFP, EFF, and ESP were used to annotate the VCF\n");
+        bw.write("\n# Score filters to apply to the variants in DOMINANT genes" +
+                      "\nfilterDOM=SAMPLE_MAF < 0.1 and (ESP_MAX_AA_EA < 0.005 and (( (POLYPHEN2_HVAR =~ 'D') + (MUTATIONTASTER =~ ['AD']) + (SIFT =~ 'D') ) >= 2)) or (ESP_MAX_AA_EA < 0.005 and IS_LOF)\n");
+
+        bw.write("\n# Score filters to apply to the variants in RECESSIVE genes" +
+                      "\nfilterREC=SAMPLE_MAF < 0.1 and (ESP_MAX_AA_EA < 0.01 and (( (POLYPHEN2_HVAR =~ 'D') + (MUTATIONTASTER =~ ['AD']) + (SIFT =~ 'D') ) >= 2)) or (ESP_MAX_AA_EA < 0.01 and IS_LOF)\n");
+
         bw.write("\n# Include data for these variants regardless of their filter scores\n" +
                 "# Variant syntax: chromosome:position\n" +
-                "# Multiple sites can be given as comma separated.\n#allowedSitesDOM=\n#allowedSitesREC=\n");
+                "# Multiple sites can be given as comma separated." +
+                "\n#allowedSites=\n");
+
         bw.write("\n# Specify which transcript model you want as output. The options are: all, longest, or mostConserved" +
                 "\n# mostConserved is defined by the TIMs score available at this site: http://glom.sph.umich.edu/GIMS" +
                 "\n# If you go with the mostConserved option, you *MUST* also provide the TIMS score file from the above website." +

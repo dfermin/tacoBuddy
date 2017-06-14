@@ -63,12 +63,12 @@ public class tacoBuddy {
 
                 if (geneType.equalsIgnoreCase("DOM")) {
                     if (globals.doAllGenes) the_vcf_parser.parseByExon(globals.ALL_geneMap, globals.filterDOM, geneType);
-                    else the_vcf_parser.parseByExon(globals.DOM_geneMap, globals.filterDOM, geneType);
+                    else if( null != globals.DOM_geneMap ) the_vcf_parser.parseByExon(globals.DOM_geneMap, globals.filterDOM, geneType);
                 }
 
                 if (geneType.equalsIgnoreCase("REC")) {
                     if (globals.doAllGenes) the_vcf_parser.parseByExon(globals.ALL_geneMap, globals.filterREC, geneType);
-                    else the_vcf_parser.parseByExon(globals.REC_geneMap, globals.filterREC, geneType);
+                    else if( null != globals.REC_geneMap ) the_vcf_parser.parseByExon(globals.REC_geneMap, globals.filterREC, geneType);
                 }
             }
         }
@@ -81,12 +81,12 @@ public class tacoBuddy {
 
                 if(geneType.equalsIgnoreCase("DOM")) {
                     if (globals.doAllGenes) the_vcf_parser.parseByTranscript(globals.ALL_geneMap, globals.filterDOM, geneType);
-                    else the_vcf_parser.parseByTranscript(globals.DOM_geneMap, globals.filterDOM, geneType);
+                    else if( null != globals.DOM_geneMap ) the_vcf_parser.parseByTranscript(globals.DOM_geneMap, globals.filterDOM, geneType);
                 }
 
                 if(geneType.equalsIgnoreCase("REC")) {
                     if (globals.doAllGenes) the_vcf_parser.parseByTranscript(globals.ALL_geneMap, globals.filterREC, geneType);
-                    else the_vcf_parser.parseByTranscript(globals.REC_geneMap, globals.filterREC, geneType);
+                    else if( null != globals.REC_geneMap ) the_vcf_parser.parseByTranscript(globals.REC_geneMap, globals.filterREC, geneType);
                 }
             }
         }
