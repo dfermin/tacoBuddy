@@ -6,7 +6,6 @@ import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.vcf.VCFFileReader;
 
 import java.io.File;
-import java.sql.SQLException;
 import java.util.*;
 
 
@@ -19,7 +18,7 @@ public class VCFParser {
     static ArrayList<VariantContext> vcList = null;
 
     // Constructor
-    VCFParser(File vcf, File tbi) throws SQLException {
+    VCFParser(File vcf, File tbi) {
         inputVCF = vcf;
         inputVCF_tabix = tbi;
 
@@ -74,7 +73,7 @@ public class VCFParser {
 
     /*****************************************************************************************************************/
     // Parse the VCF file, keeping only the variant calls that overlap with the exons of our genes of interest and meet our filtering
-    public void parseByExon(SetMultimap<String, Transcript> geneMap, String filter, String filterType) throws SQLException {
+    public void parseByExon(SetMultimap<String, Transcript> geneMap, String filter, String filterType) {
 
         vcList = new ArrayList<VariantContext>();
 
@@ -120,9 +119,6 @@ public class VCFParser {
                                 System.exit(1);
                             }
                         }
-
-                        // Load each variant into the database object
-//                        tacoBuddy.DB.loadVariant(VI, geneId);
 
                         VI.passesFilter(filter, curTS.getTranscriptID()); // Determine if this variant passes our filter
 
@@ -189,7 +185,7 @@ public class VCFParser {
                     VI.passesFilter(filter, curTS.getTranscriptID()); // Determine if this variant passes our filter
 
                     if (VI.passedFilter) {
-                        // The current variant passed JEXL filtering, now only report it if there is at least one sample harboring this variant.
+                        // The current variant passed filtering, now only report it if there is at least one sample harboring this variant.
                         if (VI.hasCandidateSubjects(filterType)) {
                             VI.printSummaryString(geneId, curTS.getTranscriptID());
                         }

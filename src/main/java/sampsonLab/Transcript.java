@@ -52,9 +52,6 @@ public class Transcript {
     public String getChrom() { return chromosome; }
     public int get_ts_Start() { return startPos; }
     public int get_ts_End() { return endPos; }
-    public int get_gene_Start() { return geneStart; }
-    public int get_gene_End() { return geneEnd; }
-    public int getNumExons() { return exonsSet.size(); }
     public int getTsLen() { return tsLen; }
     public double getTims() { return tims; }
     public void addExon(sampsonLab.Exon e) { exonsSet.add(e); }

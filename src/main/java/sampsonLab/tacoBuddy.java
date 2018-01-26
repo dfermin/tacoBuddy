@@ -8,22 +8,18 @@ import java.io.IOException;
 import java.sql.SQLException;
 
 import com.google.common.base.Joiner;
-import org.apache.commons.jexl3.parser.ParseException;
 
 
 public class tacoBuddy {
 
 
     static public globalFunctions globals;
-    static public VariantInfoNameMap VCF_Info_Name_Map;
     static VCFParser the_vcf_parser;
-    //static vcfDB DB = null;
 
-    public static void main(String[] args) throws IOException, ParseException, SQLException {
+    public static void main(String[] args) throws IOException, SQLException {
 
         // Prepare the globals object to handle user input
         globals = new globalFunctions();
-        VCF_Info_Name_Map = new VariantInfoNameMap();
 
         if( args.length < 1 ) {
             System.err.print("\nUSAGE: java -jar tacoBuddy.jar -i <input_file> or -t or -L <vcf.gz>\n" +
@@ -37,9 +33,6 @@ public class tacoBuddy {
         globals.selectTranscriptModel();
 
         the_vcf_parser = new VCFParser(globals.inputVCF, globals.inputVCF_tabix);
-
-        //DB = new vcfDB(false);
-        //DB.createVCF(globals.featureSet);
 
 
         if(globals.featureSet.contains("EFF")) {

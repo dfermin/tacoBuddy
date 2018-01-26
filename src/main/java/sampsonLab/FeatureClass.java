@@ -10,7 +10,7 @@ import java.util.HashMap;
 public class FeatureClass {
 
     // Theoretically, variables common to all the the VCF Info features would go here.
-    // But as fo 2016.Jan.09 all of our Features are so different that we have nothing in common to put here.
+    // But as of 2016.Jan.09 all of our Features are so different that we have nothing in common to put here.
     // Honestly this class was created so I could dynamically store the various feature objects.
 
     public HashMap<String, String> dataTypeMap = null; // holds SQL mapping for data types.

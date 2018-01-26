@@ -1,11 +1,11 @@
 package sampsonLab;
 
+//import com.google.common.base.Joiner;
 import com.google.common.base.Joiner;
 import htsjdk.variant.variantcontext.Genotype;
 import htsjdk.variant.variantcontext.VariantContext;
-import javafx.beans.binding.BooleanExpression;
-import org.apache.commons.jexl3.*;
 
+import javax.script.ScriptException;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -36,7 +36,7 @@ public class VariantInfo {
     // These object only get initialized if the user decides to use them
     public ESP_Features ESP = null;
     public EFF_Features EFF = null;
-    public dbNSFP_Features dbNSFP = null;
+    //public dbNSFP_Features dbNSFP = null;
 
 
 
@@ -55,10 +55,11 @@ public class VariantInfo {
         // construct snp_id string
         snp_id = chr + ":" + String.valueOf(pos);
 
+        // Holds the features the user wants to filter data on
         userFeatures = new HashMap<String, Object>();
 
         ESP = new ESP_Features();
-        dbNSFP = new dbNSFP_Features();
+        //dbNSFP = new dbNSFP_Features();
 
         genotypeMap = new HashMap<String, Genotype_Feature>();
         candPatients = new TreeSet<String>();
@@ -84,7 +85,9 @@ public class VariantInfo {
 
     /*********************************************************************************************/
     // Function records the requested data from the attributes of the variant object
+    // The features are stored as objects in the 'userFeatures' map
     public boolean fetchFeature(String feat, VariantContext vc, String transcriptID) {
+
 
         // You only need the transcriptID if the user requested 'EFF' as a filter criteria
 
@@ -99,54 +102,98 @@ public class VariantInfo {
             ESP.ESP_MAX_AA_EA = Math.max(ESP.ESP_AA_AC, ESP.ESP_EA_AC);
             ESP.ESP_MAF = ESP.calcMAF(tac);
 
-            userFeatures.put("ESP_AA_AC", ESP.ESP_AA_AC);
-            userFeatures.put("ESP_EA_AC", ESP.ESP_EA_AC);
-            userFeatures.put("ESP_MAX_AA_EA",ESP.ESP_MAX_AA_EA);
+            this.userFeatures.put("ESP_AA_AC", Double.valueOf(ESP.ESP_AA_AC));
+            this.userFeatures.put("ESP_EA_AC",Double.valueOf( ESP.ESP_EA_AC));
+            this.userFeatures.put("ESP_MAX_AA_EA", Double.valueOf(ESP.ESP_MAX_AA_EA));
 
             return true;
         }
+        else if(feat.equalsIgnoreCase("POLYPHEN2_HVAR")) {
+            String tmp = "";
+            Object o = vc.getAttribute("dbNSFP_Polyphen2_HVAR_pred", "#NULL");
+            String o_type = o.getClass().getSimpleName();
 
-        if(feat.equalsIgnoreCase("POLYPHEN2_HVAR")) {
-            String tmp = vc.getAttribute("dbNSFP_Polyphen2_HVAR_pred", "#NULL").toString().replaceAll("[\\[\\]\\s]+", "");
-            userFeatures.put(feat, tmp);
+            if(o_type.equalsIgnoreCase("ArrayList")) {
+                tmp = globalFunctions.arrayList2String(o, ".");
+            }
+            else {
+                tmp = vc.getAttribute("dbNSFP_Polyphen2_HVAR_pred", "#NULL").toString().replaceAll("[\\[\\]\\s]+", "");
+            }
+
+            this.userFeatures.put(feat, tmp);
         }
-
-        if(feat.equalsIgnoreCase("GERP")) {
-            String key = "dbNFSP_GERP___RS";
+        else if(feat.startsWith("GERP")) {
+            String key = "dbNSFP_GERP___RS";
             if(vc.hasAttribute("dbNSFP_GERP++_RS")) key = "dbNSFP_GERP++_RS";
+            String tmp = "";
+            Object o = vc.getAttribute(key, "#NULL");
+            String o_type = o.getClass().getSimpleName();
 
-            String tmp = vc.getAttribute(key, "NaN").toString().replaceAll("[\\[\\]\\s]+", "");
+            if(vc.getID().equalsIgnoreCase("22:16287339")) {
+                int debug = 1;
+            }
+
+            if(o_type.equalsIgnoreCase("ArrayList")) {
+                tmp = globalFunctions.arrayList2String(o, ".");
+            }
+            else {
+                tmp = vc.getAttribute(key, "NaN").toString().replaceAll("[\\[\\]\\s]+", "");
+            }
             String[] ary = tmp.split(",");
-            userFeatures.put(feat, Double.valueOf(ary[0]));
+            this.userFeatures.put(feat, Double.valueOf(ary[0]));
         }
+        else if(feat.equalsIgnoreCase("MUTATIONTASTER")) {
+            String tmp = "";
+            Object o = vc.getAttribute("dbNSFP_MutationTaster_pred", "#NULL");
+            String o_type = o.getClass().getSimpleName();
 
-        if(feat.equalsIgnoreCase("MUTATIONTASTER")) {
-            userFeatures.put(feat, vc.getAttribute("dbNSFP_MutationTaster_pred", "#NULL"));
+            if(o_type.equalsIgnoreCase("ArrayList")) {
+                tmp = globalFunctions.arrayList2String(o, ".");
+            }
+            else {
+                tmp = vc.getAttribute("dbNSFP_MutationTaster_pred", "#NULL").toString().replaceAll("[\\[\\]\\s]+", "");
+            }
+            this.userFeatures.put(feat, tmp);
         }
+        else if(feat.equalsIgnoreCase("SIFT")){
+            String tmp = "";
+            Object o = vc.getAttribute("dbNSFP_SIFT_pred", "#NULL");
+            String o_type = o.getClass().getSimpleName();
 
-        if(feat.equalsIgnoreCase("SIFT")){
-            String tmp = vc.getAttributeAsString("dbNSFP_SIFT_pred", "#NULL").toString().replaceAll("[\\[\\]\\s]+", "");
-            userFeatures.put(feat,tmp);
+            if(o_type.equalsIgnoreCase("ArrayList")) {
+                tmp = globalFunctions.arrayList2String(o, ".");
+            }
+            else {
+                tmp = vc.getAttributeAsString("dbNSFP_SIFT_pred", "#NULL").toString().replaceAll("[\\[\\]\\s]+", "");
+            }
+            this.userFeatures.put(feat,tmp);
         }
-
-        if(feat.equalsIgnoreCase("EFF")) {
+        else if(feat.equalsIgnoreCase("EFF")) {
             String tmp = vc.getAttributeAsString("EFF", "#NULL");
 
             if(!tmp.equalsIgnoreCase("#NULL")) {
                 EFF = new EFF_Features(tmp);
                 tmp = transcriptID.replaceAll("\\.\\d+$", "");
 
-                userFeatures.put(feat, EFF.findTS(tmp));
+                this.userFeatures.put(feat, EFF.findTS(tmp));
             }
         }
-
-        if(feat.equalsIgnoreCase("IS_LOF")) {
+        else if(feat.equalsIgnoreCase("IS_LOF")) {
             if( vc.hasAttribute("LOF") ) {
                 String tmp = vc.getAttributeAsString("LOF", "#NULL");
-                if (tmp.equalsIgnoreCase("#NULL")) userFeatures.put(feat, false);
-                else userFeatures.put(feat, Boolean.valueOf(tmp));
+                if (tmp.equalsIgnoreCase("#NULL")) this.userFeatures.put(feat, false);
+                else this.userFeatures.put(feat, true);
             }
-            else userFeatures.put(feat, false);
+            else this.userFeatures.put(feat, false);
+        }
+        else {
+            // If you got here then the user's selected feature is not a known "special" case listed above
+            if( vc.hasAttribute(feat) ) {
+                String tmp = vc.getAttributeAsString(feat, "#NULL");
+                String v = catagorizeObject(tmp);
+                this.userFeatures.put(feat, v);
+            }
+            else { this.userFeatures.put(feat, "#NULL"); }
         }
 
 
@@ -157,12 +204,12 @@ public class VariantInfo {
     /*********************************************************************************************/
     // Function applies the user's filter to this variant. Calling this function assumes VariantInfo::fetchFeature()
     // ran successfully.
-    public void passesFilter(String jexl_filter_str, String curTS) {
+    public void passesFilter(String filter_str, String curTS) {
 
         boolean retVal = false;
 
         // if you don't give the program a filter string, all variants will pass
-        if( (null == jexl_filter_str) || (jexl_filter_str.length() == 0) ) {
+        if( (null == filter_str) || (filter_str.length() == 0) ) {
             passedFilter = true;
             return;
         }
@@ -191,70 +238,44 @@ public class VariantInfo {
                 }
             }
 
+            VariantFiltering VF = new VariantFiltering(filter_str);
+            try {
+                if(filter_str.contains("SAMPLE_MAF"))
+                    userFeatures.put("SAMPLE_MAF", this.sample_MAF);
 
-            JexlEngine jexl = new JexlBuilder().cache(512).strict(true).silent(false).create(); // Create a jexl engine
-            JexlExpression expr = jexl.createExpression(jexl_filter_str); // define the expression you want to test/use
-
-            // Create a MapContext object and populate it with the variables that are in VariantInfo objects
-            JexlContext jc = new MapContext();
-
-            jc.set("SAMPLE_MAF", this.sample_MAF);
-
-            // Iterate over the features we might be filtering on
-            for(String k : this.userFeatures.keySet()) {
-
-                Object o = this.userFeatures.get(k);
-                String dataType = o.getClass().getSimpleName();
-
-                // The user may have selected to report a feature they are not filtering the data on.
-                // This if-statement prevents an error with JEXL in these cases
-                if( !jexl_filter_str.toUpperCase().contains(k.toUpperCase()) ) continue;
-
-                if(dataType.equalsIgnoreCase("Double")) {
-                    jc.set(k, o);
-                }
-
-                if(dataType.equalsIgnoreCase("String")) {
-                    String tmp = (String) o;
-                    jc.set(k, formatStringForJexl(tmp.replaceAll("#NULL", "#")));
-                }
-
-                if(dataType.equalsIgnoreCase("Boolean")) {
-                    jc.set(k, o);
-                }
-
-                if(dataType.equalsIgnoreCase("Integer")) {
-                    jc.set(k, o);
-                }
+                retVal = VF.evalVariant(userFeatures);
+            } catch (ScriptException e) {
+                e.printStackTrace();
             }
-
-            retVal = (Boolean) expr.evaluate(jc);
 
             if (retVal) passedFilter = true;
         }
     }
 
-
     /*********************************************************************************************/
-    // Function formats the given string so that Jexl will view it as an array.
-    // This function assumes the data passed to it is comma separated
-    private String formatStringForJexl(String inputStr) {
-        String ret = "";
-        HashSet<String> S = new HashSet<String>();
-        for(String s : inputStr.split(",")) {
-            String tmp = "'" + s.trim() + "'";
-            S.add(tmp);
+    // Function takes in an 'object' string and determines what type of object it really is.
+    // This function is used for dealing with what is returned by vc.getAttribute()
+    private String catagorizeObject(String s) {
+        String ret = s; // by default, just return the original value of 's' if it's a string
+
+        // Check if 's' is 100% decimal value
+        if( java.util.regex.Pattern.matches("^\\d+\\.\\d+$", s) ) {
+            ret = dbl2str(Double.parseDouble(s), 4, false);
         }
-        ret = "[" + Joiner.on(",").join(S) + "]";
+
+        // Check if 's' is 100% integer value
+        else if( java.util.regex.Pattern.matches("[^\\.\\D]+", s) ) {
+            ret = Integer.toString( Integer.parseInt(s) ); // this way we get rid of '00006' cases (for example)
+        }
+
+        // Check if 's' is an array
+        else if( java.util.regex.Pattern.matches("^[\\[\\(].+", s) ) {
+            String tmp = s.replaceAll("[\\[\\]]", "");
+            String ary[] = tmp.trim().split(",");
+            ret = catagorizeObject(ary[0]); // when we encounter an array we will take the first element only
+        }
+
         return ret;
-    }
-
-
-    /*********************************************************************************************/
-    // Function returns a non-redundant representation of the given string
-    private String makeStringNR(String s) {
-        String ret = formatStringForJexl(s);
-        return(ret.replaceAll("[\\[\\]\\s']+", ""));
     }
 
 
@@ -263,9 +284,6 @@ public class VariantInfo {
         int PRECISION = 3;
 
         if(this.allowedSite) this.modelType += "*";
-
-        // This Variant did not pass the jexl filter and is not an allowed site so don't report it
-//        if( !this.allowedSite && !this.passedFilter ) return;
 
         for(String k : this.candPatients) {
             Genotype_Feature gf = genotypeMap.get(k);
@@ -288,18 +306,26 @@ public class VariantInfo {
                 if(this.userFeatures.containsKey(feat)) {
 
                     Object o = this.userFeatures.get(feat);
+                    String o_type = o.getClass().getSimpleName(); // get the object type
 
-                    if (o.getClass().getSimpleName().equalsIgnoreCase("double")) {
+                    if (o_type.equalsIgnoreCase("double")) {
                         double d = (Double) o;
                         if(d == 1000) ary.add(".");
                         else ary.add(dbl2str(d, PRECISION, false));
                     }
-                    else if(o.getClass().getSimpleName().equalsIgnoreCase("Boolean")) {
+                    else if(o_type.equalsIgnoreCase("Boolean")) {
                         ary.add(String.valueOf(o));
                     }
-                    else {
+                    else if(o_type.equalsIgnoreCase("String")) {
                         String tmp = (String) this.userFeatures.get(feat);
-                        ary.add( this.makeStringNR(tmp) );
+                        ary.add(tmp);
+                    }
+                    else  if(o_type.equalsIgnoreCase("ArrayList")) {
+                        // Here the feature is returned as a ArrayList Object.
+                        // We need to make it non-redundant and then into a string
+                        String tmp = globalFunctions.arrayList2String(o, "#NULL");
+                        ary.add( tmp );
+
                     }
                 }
                 else ary.add("#NULL");

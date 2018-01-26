@@ -1,14 +1,11 @@
 package sampsonLab;
 
 import com.google.common.base.Joiner;
-import com.google.common.base.Predicates;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.SetMultimap;
-import com.sun.org.apache.xalan.internal.xsltc.DOM;
-import org.omg.IOP.TransactionService;
 
-import javax.swing.tree.TreeNode;
+import com.google.common.collect.HashMultimap;
+
+import com.google.common.collect.SetMultimap;
+
 import java.io.*;
 import java.sql.SQLException;
 import java.util.*;
@@ -27,6 +24,7 @@ public class globalFunctions {
     static public File inputVCF_tabix = null;
     static public File srcGFF3 = null;
     static public File TIMSfile = null;
+    static public String vcfFormat = null; // either 'gotcloud' or 'gatk'
     static public String filterDOM = null;
     static public String filterREC = null;
     static public String queryMode = null;
@@ -42,39 +40,74 @@ public class globalFunctions {
 
 
     /*----------------------------------------------------------------------------------------------------------------*/
-    static public void parseCommandLineArgs(String[] args) throws IOException, SQLException {
+    static public void parseCommandLineArgs(String[] args) throws IOException {
         File paramF = null;
 
-        if( args[0].equalsIgnoreCase("-t") ) {
-            writeTemplateInputFile();
-            System.exit(0);
+        vcfFormat = "gotCloud";
+
+        for(int j = 0; j < args.length; j++) {
+
+            if( args[j].equalsIgnoreCase("-t") ) {
+                writeTemplateInputFile();
+                break;
+            }
+
+            if( args[j].equalsIgnoreCase("-L") ) {
+                String vcf = args[1];
+                String tbi = vcf + ".tbi";
+                inputVCF = new File(vcf);
+                inputVCF_tabix = new File(tbi);
+                VCFParser vcfp = new VCFParser(inputVCF, inputVCF_tabix);
+                vcfp.printINFOfields();
+                break;
+            }
+
+            if( args[j].endsWith("gatk") ) {
+                vcfFormat = "GATK";
+            }
+
+            if( args[j].equalsIgnoreCase("-i") ) {
+                paramF = new File(args[(j+1)]);
+                if (!paramF.exists()) {
+                    System.err.print("\nERROR! Unable to find " + paramF.getCanonicalPath() + "\n");
+                    System.exit(0);
+                }
+                else {
+                    parseParamFile(paramF);
+                }
+            }
         }
 
-        if( args[0].equalsIgnoreCase("-i") ) {
-            paramF = new File(args[1]);
-            if (!paramF.exists()) {
-                System.err.print("\nERROR! Unable to find " + paramF.getCanonicalPath() + "\n");
-                System.exit(0);
-            }
-            else {
-                parseParamFile(paramF);
-            }
-        }
-
-        if(args[0].equalsIgnoreCase("-L")) {
-            String vcf = args[1];
-            String tbi = vcf + ".tbi";
-            inputVCF = new File(vcf);
-            inputVCF_tabix = new File(tbi);
-            VCFParser vcfp = new VCFParser(inputVCF, inputVCF_tabix);
-            vcfp.printINFOfields();
-            System.exit(0);
-        }
+//        if( args[0].equalsIgnoreCase("-t") ) {
+//            writeTemplateInputFile();
+//            System.exit(0);
+//        }
+//
+//        if( args[0].equalsIgnoreCase("-i") ) {
+//            paramF = new File(args[1]);
+//            if (!paramF.exists()) {
+//                System.err.print("\nERROR! Unable to find " + paramF.getCanonicalPath() + "\n");
+//                System.exit(0);
+//            }
+//            else {
+//                parseParamFile(paramF);
+//            }
+//        }
+//
+//        if(args[0].equalsIgnoreCase("-L")) {
+//            String vcf = args[1];
+//            String tbi = vcf + ".tbi";
+//            inputVCF = new File(vcf);
+//            inputVCF_tabix = new File(tbi);
+//            VCFParser vcfp = new VCFParser(inputVCF, inputVCF_tabix);
+//            vcfp.printINFOfields();
+//            System.exit(0);
+//        }
     }
 
 
     /*----------------------------------------------------------------------------------------------------------------*/
-    private static void parseParamFile(File paramF) throws IOException, SQLException {
+    private static void parseParamFile(File paramF) throws IOException {
         FileReader fr = new FileReader(paramF);
         BufferedReader br = new BufferedReader(fr);
 
@@ -166,6 +199,10 @@ public class globalFunctions {
         System.err.print("Transcript model: " + outputTranscript + "\n");
         if( outputTranscript.equalsIgnoreCase("mostConserved") ) System.err.print("TIMS file:    " + TIMSfile.getName() + "\n");
 
+        if( vcfFormat == "GATK" ) {
+            System.err.println("Assuming GATK formatted VCF file");
+        }
+
         if(null != ALL_geneMap) {
             System.err.print("Processing all genes in:  " + srcGFF3.getName() + "\n");
         }
@@ -174,8 +211,9 @@ public class globalFunctions {
             if (!genesREC.isEmpty()) System.err.print("\nREC genes:    " + genesREC + "\n");
         }
 
-        if (filterDOM != null && !genesDOM.isEmpty() ) System.err.print("\nDOM filters:  " + filterDOM + "\n");
-        if (filterREC != null && !genesREC.isEmpty() ) System.err.print("\nREC filters:  " + filterREC + "\n");
+        if (filterDOM != null) System.err.print("\nDOM filters:  " + filterDOM + "\n");
+        if (filterREC != null) System.err.print("\nREC filters:  " + filterREC + "\n");
+
         System.err.print("Selected output features: " + Joiner.on(", ").join(featureSet) + "\n");
 
         if( !(null == allowedSites) && (allowedSites.size() > 0) ) {
@@ -262,7 +300,7 @@ public class globalFunctions {
         if(null == filter_str) return;
 
         // Strip the string of parentheses
-        filter_str = filter_str.replaceAll("[\\(\\)']+", "");
+        filter_str = filter_str.replaceAll("[\\(\\)'\\/]+", "");
 
         // First split the string up by 'and' & 'or' statements
         String[] parts = filter_str.split("and|or");
@@ -300,57 +338,6 @@ public class globalFunctions {
     }
 
     /*----------------------------------------------------------------------------------------------------------------*/
-    // Function reformats the user filter to make sure it will work with jexl
-    // Specifically it converts: /[AD] =~ SIFT/ to ('A' =~ SIFT) or ('D' =~ SIFT)
-//    private static String reformat_filter(String origFilter) {
-//        String ret = "";
-//        if(!origFilter.contains("/")) ret = origFilter;
-//        else {
-//            ArrayList<String> AL = new ArrayList<String>();
-//            ArrayList<Integer> slashPos = new ArrayList<Integer>();
-//            for(int i = 0; i < origFilter.length(); i++) {
-//                if(origFilter.charAt(i) == '/') slashPos.add(i);
-//            }
-//
-//            // slashPos must have an even number of entries since the '/' always comes as a pair
-//            for(int i = 0; i < slashPos.size() - 1; i += 2) {
-//                int j = i + 1;
-//                String tmp = origFilter.substring(slashPos.get(i)+1, slashPos.get(j));
-//                AL.add(tmp);
-//            }
-//
-//            // AL now contains every instance of a perl-like or regex (example: ['ABCD'] =~ blah)
-//            // Reformat each one to be in compliance with the jexl api
-//            HashMap<String, String> jexlMap = new HashMap<String, String>();
-//            String tmp = "";
-//            for(String s : AL) {
-//                String key = s;
-//                s = s.trim().replaceAll("\\[", "").replaceAll("\\]", "").replaceAll("'", ""); // strip out []'
-//                int i = s.indexOf("=~");
-//
-//                String comparison_suffix = s.substring(i).trim();
-//                String pattern = s.substring(0,i).trim();
-//
-//                ArrayList<String> Jarray = new ArrayList<String>();
-//                for(String k : pattern.split("")) {
-//                    tmp = "('" + k + "' " + comparison_suffix + ")";
-//                    Jarray.add(tmp);
-//                }
-//                tmp = "(" + Joiner.on(" or ").join(Jarray) + ")";
-//                jexlMap.put(key, tmp); // k = original string, v = jexl compliant string
-//            }
-//
-//            // Now replace the regex values in origFilter with the new values we've created in jexlMap
-//            ret = origFilter.replaceAll("/", "");
-//            for(String k : jexlMap.keySet()) {
-//                ret = ret.replace(k, jexlMap.get(k));
-//            }
-//        }
-//        return ret;
-//    }
-
-
-    /*----------------------------------------------------------------------------------------------------------------*/
     private static void writeTemplateInputFile() throws IOException {
         File templateF = new File("./tacoBuddy-inputTemplate.txt");
         FileWriter fw = new FileWriter(templateF);
@@ -371,19 +358,19 @@ public class globalFunctions {
         bw.write("\n# List the variant information (ie: features) in the VCF file you want to report in the final output." +
                       "\n# NOTE: This list _MUST_ contain all of the field names you use in 'filterDOM' and filterREC' below." +
                       "\n# The entries here can be separated by tabs, spaces, commas or semicolons" +
-                      "\nfeatureList=EFF\n");
+                      "\nfeatureList=EFF, IS_LOF, EXAC_KG_AF_POPMAX, ONEKG_AF\n");
 
         bw.write("\n# Enter regex-like filters there for genes. " +
                       "\n# The syntax is **CRITICAL** here!" +
-                      "\n# You must write your text-based expressions as: 'query_term' =~ 'filter_field' " +
+                      "\n# You must write your text-based expressions as: 'vcf_field_name' =~ 'query_term' " +
                       "\n# Numerical filters are written as 'filter_field' <= 'numeric_cutoff' " +
                       "\n# Some default filters are given below as examples of proper syntax usage." +
                       "\n# These examples assume that dbNSFP, EFF, and ESP were used to annotate the VCF\n");
         bw.write("\n# Score filters to apply to the variants in DOMINANT genes" +
-                      "\nfilterDOM=SAMPLE_MAF < 0.1 and (ESP_MAX_AA_EA < 0.005 and (( (POLYPHEN2_HVAR =~ 'D') + (MUTATIONTASTER =~ ['AD']) + (SIFT =~ 'D') ) >= 2)) or (ESP_MAX_AA_EA < 0.005 and IS_LOF)\n");
+                      "\nfilterDOM=SAMPLE_MAF < 0.1 and (ESP_MAX_AA_EA < 0.005 and (( (POLYPHEN2_HVAR =~ /D/) + (MUTATIONTASTER =~ /[AD]/) + (SIFT =~ /D/) ) >= 2)) or (ESP_MAX_AA_EA < 0.005 and IS_LOF)\n");
 
         bw.write("\n# Score filters to apply to the variants in RECESSIVE genes" +
-                      "\nfilterREC=SAMPLE_MAF < 0.1 and (ESP_MAX_AA_EA < 0.01 and (( (POLYPHEN2_HVAR =~ 'D') + (MUTATIONTASTER =~ ['AD']) + (SIFT =~ 'D') ) >= 2)) or (ESP_MAX_AA_EA < 0.01 and IS_LOF)\n");
+                      "\nfilterREC=SAMPLE_MAF < 0.1 and (ESP_MAX_AA_EA < 0.01 and (( (POLYPHEN2_HVAR =~ /D/) + (MUTATIONTASTER =~ /[AD]/) + (SIFT =~ /D/) ) >= 2)) or (ESP_MAX_AA_EA < 0.01 and IS_LOF)\n");
 
         bw.write("\n# Include data for these variants regardless of their filter scores\n" +
                 "# Variant syntax: chromosome:position\n" +
@@ -747,5 +734,31 @@ public class globalFunctions {
         }
         br.close();
     }
+
+
+    /*------------------------------------------------------------------------------------------------------------------
+    ** Function takes in an Object that is an 'ArrayList' object and
+    ** 1) makes it non-redundant
+    ** 2) removes any NULLs *IF* their are other values in the arrayList
+     */
+    public static String  arrayList2String(Object o, String nullStr) {
+
+        // Assign the contents of the arrayList to a hashSet (thus making them unique)
+        Set<String> hs = new HashSet<String>();
+        hs.addAll((ArrayList<String>) o);
+
+        // Store the hashSet back into an arrayList
+        ArrayList<String> al = new ArrayList<String>();
+        al.addAll(hs);
+
+        // If the arrayList as more than one value and one of them is 'nullStr', remove 'nullStr'
+        if ((al.size() > 1) && (al.contains(nullStr))) {
+            al.remove(nullStr);
+        }
+
+        String ret = String.join(",", al);
+        return(ret);
+    }
+
 
 }

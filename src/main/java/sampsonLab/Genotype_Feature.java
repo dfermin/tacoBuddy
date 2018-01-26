@@ -46,10 +46,17 @@ public class Genotype_Feature extends FeatureClass {
 
             if (G.hasGQ()) this.GQ = G.getGQ();
 
-            if (G.hasAD()) {
-                this.refReadDepth = G.getAD()[0];
-                this.altReadDepth = G.getAD()[1];
-                this.totReadDepth = this.refReadDepth + this.altReadDepth;
+            if(globalFunctions.vcfFormat == "GATK") {
+                if (G.hasAD()) {
+                    this.refReadDepth = G.getAD()[0];
+                    this.altReadDepth = G.getAD()[1];
+                    this.totReadDepth = this.refReadDepth + this.altReadDepth;
+                }
+            }
+            else {
+                if(G.hasDP()) {
+                    this.totReadDepth = G.getDP();
+                }
             }
 
             for (Allele a : G.getAlleles()) {
@@ -69,9 +76,16 @@ public class Genotype_Feature extends FeatureClass {
      */
     public String getReadCount() {
         String ret = "";
-        ret = Integer.toString(this.totReadDepth) + "\t" +
-              "r=" + Integer.toString(this.refReadDepth) + "/" +
-              "a=" + Integer.toString(this.altReadDepth);
+
+        if(globalFunctions.vcfFormat.equalsIgnoreCase("gotCloud")) {
+            ret =  Integer.toString(this.totReadDepth) + "\tr=NaN/a=NaN";
+        }
+        else if(globalFunctions.vcfFormat.equalsIgnoreCase("GATK")) {
+            ret = Integer.toString(this.totReadDepth) + "\t" +
+                    "r=" + Integer.toString(this.refReadDepth) + "/" +
+                    "a=" + Integer.toString(this.altReadDepth);
+        }
+
         return(ret);
     }
 
