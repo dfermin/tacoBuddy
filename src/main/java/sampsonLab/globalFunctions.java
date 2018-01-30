@@ -34,7 +34,6 @@ public class globalFunctions {
     static public Set<String> genesREC = null;
     static public SortedSet<String> featureSet = null;
     static public SetMultimap<String, Transcript> REC_geneMap = null, DOM_geneMap = null, ALL_geneMap = null;
-    //static public SortedSet<String> allowedSites = null;
     static public TreeMap<String, Integer> allowedSites = null;
 
 
@@ -151,11 +150,12 @@ public class globalFunctions {
             // Sites to keep and report no matter what their filter scores are
             if(line.startsWith("allowedSites")) {
                 if(null == allowedSites ) {
-                    //allowedSites = new TreeSet<String>();
                     allowedSites = new TreeMap<String, Integer>();
                 }
-                //for(String s : line.substring(13).split("[,;\\s]+")) allowedSites.add(s);
-                for(String s : line.substring(13).split("[,;\\s]+")) allowedSites.put(s, 0);
+                for(String s : line.substring(13).split("[,;\\s]+")) {
+                    if(s.length() > 5) allowedSites.put(s, 0);
+                }
+                if(allowedSites.isEmpty()) allowedSites = null;
             }
 
             if(line.startsWith("filterDOM=")) filterDOM = line.substring(10);
@@ -192,7 +192,7 @@ public class globalFunctions {
         if (filterDOM != null) System.err.print("\nDOM filters:  " + filterDOM + "\n");
         if (filterREC != null) System.err.print("\nREC filters:  " + filterREC + "\n");
 
-        System.err.print("Selected output features: " + Joiner.on(", ").join(featureSet) + "\n");
+        System.err.print("\nSelected output features: " + Joiner.on(", ").join(featureSet) + "\n");
 
         if( !(null == allowedSites) && (allowedSites.size() > 0) ) {
             System.err.print("Requested sites:\n");

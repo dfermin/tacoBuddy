@@ -179,7 +179,7 @@ public class VariantInfo {
         else if(feat.equalsIgnoreCase("EXAC_MAX_MAF")) {
             double v = get_EXAC_MAX_MAF(vc);
             if( v == -1 ) this.userFeatures.put(feat, "#NULL");
-            else this.userFeatures.put(feat, v);
+            else this.userFeatures.put(feat, dbl2str(v, 4, false));
         }
         else if(feat.equalsIgnoreCase("IS_LOF")) {
             if( vc.hasAttribute("LOF") ) {
@@ -215,7 +215,7 @@ public class VariantInfo {
             String ac_k = "EXAC_AC_" + curPop;
             String ac_tmp = vc.getAttributeAsString(ac_k, "#NULL");
 
-            String an_k = "EXAC_AF_" + curPop;
+            String an_k = "EXAC_AN_" + curPop;
             String an_tmp = vc.getAttributeAsString(an_k, "#NULL");
 
             // If you are missing either AC or AN you can't compute AF so skip this population
@@ -223,10 +223,18 @@ public class VariantInfo {
 
             // We are making the assumption that *IF* there are multiple values for this
             // entry, the first one list is the smallest value.
+            ac_tmp = ac_tmp.replaceAll("[\\[\\]]", "");
+            an_tmp = an_tmp.replaceAll("[\\[\\]]", "");
             double AC = Double.valueOf( ac_tmp.split(",")[0] );
             double AN = Double.valueOf( an_tmp.split(",")[0] );
             double AF = AC / AN;
-            obsAF.add(AF);
+
+            if(AF > 0.5) {
+                double d = 1 - AF;
+                AF = d;
+            }
+
+            if( !Double.isNaN(AF) ) obsAF.add(AF);
         }
 
         if(obsAF.size() > 0) {
@@ -393,7 +401,7 @@ public class VariantInfo {
             genotypeMap.put(s, gf);
         }
 
-        this.calcSampleAF(); // compute the sample allele frequency now that you have recorded all the samples
+        this.calcSampleMAF(); // compute the sample allele frequency now that you have recorded all the samples
     }
 
 
@@ -433,7 +441,7 @@ public class VariantInfo {
     // Function returns the minor allele frequency (MAF) for all the subjects in the VCF file.
     // The formula is: 1 - sum_over_i(genotype[0,1,2]) / (2*N)
     // Where i = a subject, and N = number of subjects
-    public void calcSampleAF() {
+    public void calcSampleMAF() {
 
         double sum = 0;
         double n = 0;
@@ -445,8 +453,10 @@ public class VariantInfo {
         }
 
         double N = 2.0 * n;
-        double tmp = (sum / N);
-        if(Double.isNaN(tmp)) sample_MAF = 0;
+        double tmp = 1.0 - (sum / N);
+
+        // The minor allele frequency has to be less than 0.5
+        if(tmp > 0.5) sample_MAF = 1 - tmp;
         else sample_MAF = tmp;
     }
 
