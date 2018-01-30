@@ -7,7 +7,6 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
 
 import java.io.*;
-import java.sql.SQLException;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
@@ -35,7 +34,8 @@ public class globalFunctions {
     static public Set<String> genesREC = null;
     static public SortedSet<String> featureSet = null;
     static public SetMultimap<String, Transcript> REC_geneMap = null, DOM_geneMap = null, ALL_geneMap = null;
-    static public SortedSet<String> allowedSites = null;
+    //static public SortedSet<String> allowedSites = null;
+    static public TreeMap<String, Integer> allowedSites = null;
 
 
 
@@ -77,32 +77,6 @@ public class globalFunctions {
                 }
             }
         }
-
-//        if( args[0].equalsIgnoreCase("-t") ) {
-//            writeTemplateInputFile();
-//            System.exit(0);
-//        }
-//
-//        if( args[0].equalsIgnoreCase("-i") ) {
-//            paramF = new File(args[1]);
-//            if (!paramF.exists()) {
-//                System.err.print("\nERROR! Unable to find " + paramF.getCanonicalPath() + "\n");
-//                System.exit(0);
-//            }
-//            else {
-//                parseParamFile(paramF);
-//            }
-//        }
-//
-//        if(args[0].equalsIgnoreCase("-L")) {
-//            String vcf = args[1];
-//            String tbi = vcf + ".tbi";
-//            inputVCF = new File(vcf);
-//            inputVCF_tabix = new File(tbi);
-//            VCFParser vcfp = new VCFParser(inputVCF, inputVCF_tabix);
-//            vcfp.printINFOfields();
-//            System.exit(0);
-//        }
     }
 
 
@@ -176,8 +150,12 @@ public class globalFunctions {
 
             // Sites to keep and report no matter what their filter scores are
             if(line.startsWith("allowedSites")) {
-                if(null == allowedSites ) allowedSites = new TreeSet<String>();
-                for(String s : line.substring(13).split("[,;\\s]+")) allowedSites.add(s);
+                if(null == allowedSites ) {
+                    //allowedSites = new TreeSet<String>();
+                    allowedSites = new TreeMap<String, Integer>();
+                }
+                //for(String s : line.substring(13).split("[,;\\s]+")) allowedSites.add(s);
+                for(String s : line.substring(13).split("[,;\\s]+")) allowedSites.put(s, 0);
             }
 
             if(line.startsWith("filterDOM=")) filterDOM = line.substring(10);
@@ -218,7 +196,7 @@ public class globalFunctions {
 
         if( !(null == allowedSites) && (allowedSites.size() > 0) ) {
             System.err.print("Requested sites:\n");
-            for(String k : allowedSites) {
+            for(String k : allowedSites.keySet()) {
                 System.err.println("\t" + k);
             }
         }
@@ -438,13 +416,18 @@ public class globalFunctions {
 
             if(data[2].equalsIgnoreCase("transcript")) {
 
-                // Check to see if curTranscript is null, if it isn't you need to store this variable
+                // Check to see if curTranscript is null, if it isn't you need to store this variable first
                 // before you can continue;
                 if(curTranscript != null) {
                     curTranscript.calcCDSlength();
-                    if(genesDOM.contains(curTranscript.getGeneName())) DOM_geneMap.put(curTranscript.getGeneName(), curTranscript);
-                    else if(genesREC.contains(curTranscript.getGeneName())) REC_geneMap.put(curTranscript.getGeneName(), curTranscript);
-                    else if( null != ALL_geneMap ) ALL_geneMap.put(curTranscript.getGeneName(), curTranscript);
+                    if(genesDOM.contains(curTranscript.getGeneName()))
+                        DOM_geneMap.put(curTranscript.getGeneName(), curTranscript);
+
+                    else if(genesREC.contains(curTranscript.getGeneName()))
+                        REC_geneMap.put(curTranscript.getGeneName(), curTranscript);
+
+                    else if( null != ALL_geneMap )
+                        ALL_geneMap.put(curTranscript.getGeneName(), curTranscript);
                 }
                 curTranscript = null;
 

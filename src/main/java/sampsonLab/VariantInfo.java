@@ -36,7 +36,6 @@ public class VariantInfo {
     // These object only get initialized if the user decides to use them
     public ESP_Features ESP = null;
     public EFF_Features EFF = null;
-    //public dbNSFP_Features dbNSFP = null;
 
 
 
@@ -59,7 +58,6 @@ public class VariantInfo {
         userFeatures = new HashMap<String, Object>();
 
         ESP = new ESP_Features();
-        //dbNSFP = new dbNSFP_Features();
 
         genotypeMap = new HashMap<String, Genotype_Feature>();
         candPatients = new TreeSet<String>();
@@ -77,7 +75,10 @@ public class VariantInfo {
         String search_str = chr + ":" + String.valueOf(pos);
 
         if( null != globalFunctions.allowedSites ) {
-            if( globalFunctions.allowedSites.contains(search_str)) this.allowedSite = true;
+            if( globalFunctions.allowedSites.keySet().contains(search_str)) {
+                this.allowedSite = true;
+                globalFunctions.allowedSites.put(search_str, 1); // mark this allowedSite as "observed"
+            }
         }
     }
 
@@ -129,9 +130,6 @@ public class VariantInfo {
             Object o = vc.getAttribute(key, "#NULL");
             String o_type = o.getClass().getSimpleName();
 
-            if(vc.getID().equalsIgnoreCase("22:16287339")) {
-                int debug = 1;
-            }
 
             if(o_type.equalsIgnoreCase("ArrayList")) {
                 tmp = globalFunctions.arrayList2String(o, ".");
@@ -178,6 +176,11 @@ public class VariantInfo {
                 this.userFeatures.put(feat, EFF.findTS(tmp));
             }
         }
+        else if(feat.equalsIgnoreCase("EXAC_MAX_MAF")) {
+            double v = get_EXAC_MAX_MAF(vc);
+            if( v == -1 ) this.userFeatures.put(feat, "#NULL");
+            else this.userFeatures.put(feat, v);
+        }
         else if(feat.equalsIgnoreCase("IS_LOF")) {
             if( vc.hasAttribute("LOF") ) {
                 String tmp = vc.getAttributeAsString("LOF", "#NULL");
@@ -199,6 +202,40 @@ public class VariantInfo {
 
         return true; // if you got here then you had no problems in this function
     }
+
+
+    /*********************************************************************************************/
+    // Function computes the maximum minor allele frequency as reported by the EXAC fields
+    private double get_EXAC_MAX_MAF(VariantContext vc) {
+        double ret = -1;
+
+        String popn[] = { "AFR", "AMR", "EAS", "FIN", "NFE", "SAS", "OTH" };
+        ArrayList<Double> obsAF = new ArrayList<>();
+        for(String curPop : popn) {
+            String ac_k = "EXAC_AC_" + curPop;
+            String ac_tmp = vc.getAttributeAsString(ac_k, "#NULL");
+
+            String an_k = "EXAC_AF_" + curPop;
+            String an_tmp = vc.getAttributeAsString(an_k, "#NULL");
+
+            // If you are missing either AC or AN you can't compute AF so skip this population
+            if( (an_tmp == "#NULL") || (ac_tmp == "#NULL") ) continue;
+
+            // We are making the assumption that *IF* there are multiple values for this
+            // entry, the first one list is the smallest value.
+            double AC = Double.valueOf( ac_tmp.split(",")[0] );
+            double AN = Double.valueOf( an_tmp.split(",")[0] );
+            double AF = AC / AN;
+            obsAF.add(AF);
+        }
+
+        if(obsAF.size() > 0) {
+            ret = Collections.max(obsAF); // get the largest MAF observed
+        }
+
+        return ret;
+    }
+
 
 
     /*********************************************************************************************/
@@ -283,7 +320,13 @@ public class VariantInfo {
     public void printSummaryString (String geneId, String transcriptID) {
         int PRECISION = 3;
 
-        if(this.allowedSite) this.modelType += "*";
+        if(null == geneId) geneId = ""; // to handle the 'AllowedSites' instances
+        if(null == transcriptID) transcriptID = ""; // to handle the 'AllowedSites' instances
+
+        if(this.allowedSite) {
+            if( !this.modelType.contains("*") )
+                this.modelType += "*";
+        }
 
         for(String k : this.candPatients) {
             Genotype_Feature gf = genotypeMap.get(k);
@@ -338,42 +381,6 @@ public class VariantInfo {
         }
 
     }
-
-    /*********************************************************************************************/
-    // Function returns the requested feature field from this variant in the appropriate dataType form
-    // to go into a database.
-    public String getDBformattedFeature(String feat) {
-        String ret = "NULL";
-        if(this.userFeatures.containsKey(feat)) {
-
-            Object o = this.userFeatures.get(feat);
-            String dataType = o.getClass().getSimpleName();
-
-            if(dataType.equalsIgnoreCase("double")) {
-                double d = (Double) o;
-                ret = String.valueOf(d);
-            }
-
-            if(dataType.equalsIgnoreCase("Boolean")) {
-                boolean b = (Boolean) o;
-                if(b) ret = "1";
-                else ret = "0";
-            }
-
-            if(dataType.equalsIgnoreCase("Integer")) {
-                int i = (Integer) o;
-                ret = String.valueOf(i);
-            }
-
-            if(dataType.equalsIgnoreCase("String")) {
-                String s = (String) o;
-                if(s.contains("#NULL")) s = ".";
-                ret = "'" + s + "'";
-            }
-        }
-        return(ret);
-    }
-
 
     /*********************************************************************************************/
     // Function adds the observed genotype information for all the subjects for the current variant

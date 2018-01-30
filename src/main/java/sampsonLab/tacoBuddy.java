@@ -53,6 +53,7 @@ public class tacoBuddy {
         if(globals.queryMode.equalsIgnoreCase("exon")) {
 
             for(String geneType :  new String[] { "DOM", "REC"}) {
+                System.out.println("Exon Search\t" + geneType + " model");
 
                 if (geneType.equalsIgnoreCase("DOM")) {
                     if (globals.doAllGenes) the_vcf_parser.parseByExon(globals.ALL_geneMap, globals.filterDOM, geneType);
@@ -71,6 +72,7 @@ public class tacoBuddy {
         if(globals.queryMode.equalsIgnoreCase("transcript")) {
 
             for(String geneType :  new String[] { "DOM", "REC"}) {
+                System.out.println("Transcript Search\t" + geneType + " model");
 
                 if(geneType.equalsIgnoreCase("DOM")) {
                     if (globals.doAllGenes) the_vcf_parser.parseByTranscript(globals.ALL_geneMap, globals.filterDOM, geneType);
@@ -82,6 +84,14 @@ public class tacoBuddy {
                     else if( null != globals.REC_geneMap ) the_vcf_parser.parseByTranscript(globals.REC_geneMap, globals.filterREC, geneType);
                 }
             }
+        }
+
+        // Record any entries in 'allowedSites' that were not covered by either of the two queryModes above
+        // This will only happen if the user elected to allow a site that is not contained within any of the
+        // genes they listed in the input parameter file.
+        if(the_vcf_parser.checkForUnreportedAllowedSites()) {
+            System.out.println("Allowed Sites (AS) search");
+            the_vcf_parser.parseByAllowedSites();
         }
     }
 

@@ -2,6 +2,7 @@ package sampsonLab;
 
 import com.google.common.collect.SetMultimap;
 import htsjdk.samtools.util.CloseableIterator;
+import htsjdk.variant.variantcontext.CommonInfo;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.vcf.VCFFileReader;
 
@@ -15,7 +16,7 @@ import java.util.*;
 public class VCFParser {
 
     static File inputVCF = null, inputVCF_tabix = null;
-    static ArrayList<VariantContext> vcList = null;
+    //static ArrayList<VariantContext> vcList = null;
 
     // Constructor
     VCFParser(File vcf, File tbi) {
@@ -70,18 +71,98 @@ public class VCFParser {
     }
 
 
+    /*****************************************************************************************************************/
+    // Function returns true if any of the values in globalFunctions.allowedSites are not set to 1
+    public Boolean checkForUnreportedAllowedSites() {
+
+        for(String s : globalFunctions.allowedSites.keySet()) {
+            int status = globalFunctions.allowedSites.get(s);
+            if(status == 0) return true;
+        }
+        return false;
+    }
+
+    /*****************************************************************************************************************/
+    // Function Parses the VCF file keeping only the 'allowedSites' variants
+    // No filter is applied to these cases.
+    public void parseByAllowedSites() {
+
+        // This command only works if you have the tabix tbi file for the input VCF
+        VCFFileReader vcfr = new VCFFileReader(inputVCF, inputVCF_tabix);
+
+        for(String AS : globalFunctions.allowedSites.keySet()) {
+            if(globalFunctions.allowedSites.get(AS) == 1) continue;
+
+            String chrom = AS.split(":")[0];
+            int ASpos = Integer.valueOf( AS.split(":")[1] );
+
+            CloseableIterator<VariantContext> it = vcfr.query(chrom, ASpos, ASpos);
+
+            while(it.hasNext()) {
+                VariantContext vc = it.next();
+                String chr = vc.getContig();
+                int pos = vc.getEnd();
+                double svmProb = Double.NaN;
+
+                CommonInfo CI = vc.getCommonInfo();
+                String geneInfo = CI.getAttributeAsString("DBSNP147_GENEINFO", "#NULL");
+
+
+                if( vc.getID().equalsIgnoreCase("SVM_PROBABILITY") )
+                    svmProb = Double.parseDouble((String) vc.getAttribute("SVM_PROBABILITY"));
+
+                String ref = vc.getReference().getDisplayString(); // get the reference Allele NT
+                String alt = vc.getAltAlleleWithHighestAlleleCount().getDisplayString(); // get the alternative Allele NT
+                String dbsnp_id = vc.getID();
+                VariantInfo VI = new VariantInfo(chr, pos, dbsnp_id, ref, alt, "AS"); // AS = Allowed Site
+                VI.setSvmProb(svmProb);
+                VI.add(vc);
+                VI.allowedSite = true;
+
+                if(CI.hasAttribute("EFF")) {
+                    VI.EFF = new EFF_Features(CI.getAttributeAsString("EFF", "#NULL"));
+                }
+
+                // Iterate over the features in 'globals::featureSet'
+                // Record all of these features for the current 'VI' object
+                for(String s : globalFunctions.featureSet) {
+
+                    if(s.equalsIgnoreCase("EFF")) {
+                        for(String curTS : VI.EFF.eff.keySet()) {
+                            VI.fetchFeature(s, vc, curTS);
+                        }
+                    }
+                    else if( !VI.fetchFeature(s, vc, null) ) {
+                        System.err.println("\nERROR with variant: " + VI.getID() + ":\nTrying to get " + s + "\n");
+                        System.exit(1);
+                    }
+                }
+
+                if(VI.hasCandidateSubjects("AS")) {   // AS = Allowed Sites
+
+                    if(null != VI.EFF) {
+                        for(String curTS : VI.EFF.eff.keySet()) {
+                            VI.printSummaryString(geneInfo, curTS);
+                        }
+                    }
+                    else VI.printSummaryString(geneInfo, null);
+                }
+            }
+
+        }
+    }
 
     /*****************************************************************************************************************/
     // Parse the VCF file, keeping only the variant calls that overlap with the exons of our genes of interest and meet our filtering
     public void parseByExon(SetMultimap<String, Transcript> geneMap, String filter, String filterType) {
 
-        vcList = new ArrayList<VariantContext>();
-
         // This command only works if you have the tabix tbi file for the input VCF
         VCFFileReader vcfr = new VCFFileReader(inputVCF, inputVCF_tabix);
 
+        ArrayList<String> geneOrder = sortGenes(geneMap);
+
         int FLANK = 2; // Allow for 2 basepairs of deviation around a variant site
-        for(String geneId: geneMap.keySet()) { // Iterate over the genes in the given geneMap
+        for(String geneId: geneOrder) { // Iterate over the genes in the given geneMap
 
             for(Transcript curTS : geneMap.get(geneId)) { // Iterate over the transcripts for this gene
 
@@ -139,14 +220,14 @@ public class VCFParser {
     // Parse the VCF file, keeping only the variant calls that overlap with our transcripts of interest and meet our filtering
     public void parseByTranscript(SetMultimap<String, Transcript> geneMap, String filter, String filterType) {
 
-        vcList = new ArrayList<VariantContext>();
-
         // This command only works if you have the tabix tbi file for the input VCF
         VCFFileReader vcfr = new VCFFileReader(inputVCF, inputVCF_tabix);
 
+        ArrayList<String> geneOrder = sortGenes(geneMap);
+
         int ctr = 1;
         int FLANK = 20;
-        for(String geneId: geneMap.keySet()) { // Iterate over the genes in the given geneMap
+        for(String geneId: geneOrder) { // Iterate over the genes in the given geneMap
 
             for(Transcript curTS : geneMap.get(geneId)) { // Iterate over the transcripts for this gene
 
@@ -194,4 +275,56 @@ public class VCFParser {
             }
         }
     }
+
+
+    /*****************************************************************************************************************/
+    // Function sorts the gene in the given map so they occur in genomic order
+    private ArrayList<String> sortGenes(SetMultimap<String, Transcript> geneMap) {
+        ArrayList<String> ret = new ArrayList<>();
+
+        List<CoordClass> listCoord = new ArrayList<CoordClass>();
+        Set<String> geneSet = new HashSet<>();
+
+        for(String gid : geneMap.keys()) {
+
+            if( geneSet.contains(gid) ) continue; // we've recorded this gene, move on
+
+
+            for(Transcript curTS : geneMap.get(gid)) {
+
+                String obsChrom = curTS.getTrimmedChrom(); // removes the 'chr' part if present from chromosome name
+                int geneStart = curTS.getGeneStart();
+
+                // In order for this to work, we need to render all chromosomes as integers
+                // This code takes care of chromosome X, Y, and MT
+                int chrom = 0;
+                if(obsChrom.matches("^\\d+$")) chrom = Integer.valueOf(obsChrom);
+                else if(obsChrom.equalsIgnoreCase("X")) chrom = 23;
+                else if(obsChrom.equalsIgnoreCase("Y")) chrom = 24;
+                else if(obsChrom.matches("[MT]")) chrom = 25;
+                else continue;
+
+
+
+                listCoord.add(new CoordClass(chrom, gid, geneStart));
+                geneSet.add(gid);
+            }
+        }
+
+
+        // Sort the listCoord array by Chromosome then position
+        Collections.sort(listCoord, new CoordClassComparator(
+                new CoordClassChromComparator(),
+                new CoordClassPositionComparator()
+        ));
+
+        // Record the genes in genomic order
+        for(CoordClass C : listCoord) {
+            ret.add(C.getGeneID());
+        }
+
+        return ret;
+    }
+
+
 }
