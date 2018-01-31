@@ -36,7 +36,7 @@ public class tacoBuddy {
 
 
         if(globals.featureSet.contains("EFF")) {
-            double x = globals.required_min_sample_maf * 100;
+            double x = globals.required_min_sample_af * 100;
             System.err.println("\nFilters based on EFF info fields:\n" +
                     "\t1. Synonymous SNPs excluded\n" +
                     "\t2. HIGH impact variants with Sample_MAF < " + x + "% will always be reported\n");
@@ -44,7 +44,7 @@ public class tacoBuddy {
 
         // Print header line
         String hdr = "#SAMPLE\tGenotype\tmodel\tTranscriptID\tGene_Name\tchrom\tpos\tdbsnpID\tREF\tALT\t" +
-                     "ReadCounts (total)\tReadCounts (ref/alt)\tSAMPLE_MAF (as %)\t";
+                     "ReadCounts (total)\tReadCounts (ref/alt)\tSAMPLE_AF (as %)\t";
         hdr += Joiner.on("\t").join(globalFunctions.featureSet);
         System.out.println(hdr);
 

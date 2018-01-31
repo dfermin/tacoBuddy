@@ -223,11 +223,14 @@ public class VCFParser {
         // This command only works if you have the tabix tbi file for the input VCF
         VCFFileReader vcfr = new VCFFileReader(inputVCF, inputVCF_tabix);
 
+        //HashMap<String, ArrayList<VariantInfo> > variantMap = new HashMap<>();
+
         ArrayList<String> geneOrder = sortGenes(geneMap);
 
-        int ctr = 1;
         int FLANK = 20;
         for(String geneId: geneOrder) { // Iterate over the genes in the given geneMap
+
+            //variantMap.put(geneId, new ArrayList<VariantInfo>()); // prep for this iteration
 
             for(Transcript curTS : geneMap.get(geneId)) { // Iterate over the transcripts for this gene
 

@@ -26,7 +26,7 @@ public class VariantInfo {
     public String modelType; // REC or DOM
 
     public double svmProb;
-    public double sample_MAF; // minor allele frequency for the samples
+    public double sample_AF; // Allele frequency for the samples
 
     public HashMap<String, Genotype_Feature> genotypeMap; // k = sampleID, v = genotype_feature object for this subject
     public SortedSet<String> candPatients;
@@ -48,7 +48,7 @@ public class VariantInfo {
         this.modelType = mt;
         this.svmProb = 0.0;
         this.passedFilter = false;
-        this.sample_MAF = -1.0;
+        this.sample_AF = -1.0;
         this.allowedSite = false;
 
         // construct snp_id string
@@ -227,14 +227,14 @@ public class VariantInfo {
             an_tmp = an_tmp.replaceAll("[\\[\\]]", "");
             double AC = Double.valueOf( ac_tmp.split(",")[0] );
             double AN = Double.valueOf( an_tmp.split(",")[0] );
-            double AF = AC / AN;
+            double MAF = AC / AN;
 
-            if(AF > 0.5) {
-                double d = 1 - AF;
-                AF = d;
+            if(MAF > 0.5) {
+                double d = 1 - MAF;
+                MAF = d;
             }
 
-            if( !Double.isNaN(AF) ) obsAF.add(AF);
+            if( !Double.isNaN(MAF) ) obsAF.add(MAF);
         }
 
         if(obsAF.size() > 0) {
@@ -277,7 +277,7 @@ public class VariantInfo {
 
                 // Check to see if this is a high-impact mutation
                 // Keep any high-impact mutations that have a minor allele frequency < req_min_sample_maf in our VCF file
-                if(EFF.checkEFFimpact(curTS, "HIGH") && (this.sample_MAF < globalFunctions.required_min_sample_maf) ) {
+                if(EFF.checkEFFimpact(curTS, "HIGH") && (this.sample_AF < globalFunctions.required_min_sample_af) ) {
                     passedFilter = false;
                     return;
                 }
@@ -285,8 +285,8 @@ public class VariantInfo {
 
             VariantFiltering VF = new VariantFiltering(filter_str);
             try {
-                if(filter_str.contains("SAMPLE_MAF"))
-                    userFeatures.put("SAMPLE_MAF", this.sample_MAF);
+                if(filter_str.contains("SAMPLE_AF"))
+                    userFeatures.put("SAMPLE_AF", this.sample_AF);
 
                 retVal = VF.evalVariant(userFeatures);
             } catch (ScriptException e) {
@@ -336,6 +336,8 @@ public class VariantInfo {
                 this.modelType += "*";
         }
 
+        int debug = 1;
+
         for(String k : this.candPatients) {
             Genotype_Feature gf = genotypeMap.get(k);
             ArrayList<String> ary = new ArrayList<String>();
@@ -351,7 +353,7 @@ public class VariantInfo {
             ary.add(this.REF);
             ary.add(this.ALT);
             ary.add(gf.getReadCount()); // read depth
-            ary.add( dbl2str(this.sample_MAF, PRECISION, true) );
+            ary.add( dbl2str(this.sample_AF, PRECISION, true) );
 
             for(String feat : globalFunctions.featureSet) {
                 if(this.userFeatures.containsKey(feat)) {
@@ -401,7 +403,7 @@ public class VariantInfo {
             genotypeMap.put(s, gf);
         }
 
-        this.calcSampleMAF(); // compute the sample allele frequency now that you have recorded all the samples
+        this.calcSampleAF(); // compute the sample allele frequency now that you have recorded all the samples
     }
 
 
@@ -414,20 +416,17 @@ public class VariantInfo {
 
             if(g.genotype_word.equalsIgnoreCase("#NULL")) continue; // no information for this variant in this sample so skip it.
 
-            // The filter is for dominant variants,
-            // and the current subject is homozygous alternative so skip it..
-            if(filterType.equalsIgnoreCase("DOM") && g.genotype_word.equalsIgnoreCase("HOM_ALT")) continue;
+            // The filter is for dominant variants
+            // Keep subjects that are HET or HOM_ALT
+            if( filterType.equalsIgnoreCase("DOM") && (g.genotypeInt > 0) ) candPatients.add(g.sampleID);
 
-            // The filter is for recessive variants,
-            // and the current subject is NOT homozygous alternative so skip it..
-            if(!this.allowedSite && filterType.equalsIgnoreCase("REC") && !g.genotype_word.equalsIgnoreCase("HOM_ALT")) continue;
+            // the filter is for recessive variants
+            // Keep subjects that are HOM_ALT
+            if( filterType.equalsIgnoreCase("REC") && (g.genotypeInt == 2) ) candPatients.add(g.sampleID);
 
-            // This is an allowed site
-            // The filter is for recessive variants
-            // The current subject is homozygous reference we skip it.
-            if(this.allowedSite && filterType.equalsIgnoreCase("REC") && g.genotype_word.equalsIgnoreCase("HOM")) continue;
+            // This is an allowed site outside
+            if( filterType.equalsIgnoreCase("AS") && this.allowedSite && (g.genotypeInt > 0) ) candPatients.add(g.sampleID);
 
-            candPatients.add(g.sampleID);
         }
 
         if(candPatients.size() > 0) ret = true;
@@ -438,10 +437,10 @@ public class VariantInfo {
 
 
     /*********************************************************************************************/
-    // Function returns the minor allele frequency (MAF) for all the subjects in the VCF file.
-    // The formula is: 1 - sum_over_i(genotype[0,1,2]) / (2*N)
+    // Function returns the allele frequency (AF) for all the subjects in the VCF file.
+    // The formula is: sum_over_i(genotype[0,1,2]) / (2*N)
     // Where i = a subject, and N = number of subjects
-    public void calcSampleMAF() {
+    public void calcSampleAF() {
 
         double sum = 0;
         double n = 0;
@@ -453,11 +452,7 @@ public class VariantInfo {
         }
 
         double N = 2.0 * n;
-        double tmp = 1.0 - (sum / N);
-
-        // The minor allele frequency has to be less than 0.5
-        if(tmp > 0.5) sample_MAF = 1 - tmp;
-        else sample_MAF = tmp;
+        sample_AF = (sum / N);
     }
 
 

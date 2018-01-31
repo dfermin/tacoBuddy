@@ -28,7 +28,7 @@ public class globalFunctions {
     static public String filterREC = null;
     static public String queryMode = null;
     static public String outputTranscript = null;
-    static public double required_min_sample_maf = 0.1;
+    static public double required_min_sample_af = 0.1;
     static public boolean doAllGenes = false;
     static public Set<String> genesDOM = null;
     static public Set<String> genesREC = null;
@@ -48,7 +48,7 @@ public class globalFunctions {
 
             if( args[j].equalsIgnoreCase("-t") ) {
                 writeTemplateInputFile();
-                break;
+                System.exit(0);
             }
 
             if( args[j].equalsIgnoreCase("-L") ) {
@@ -58,7 +58,7 @@ public class globalFunctions {
                 inputVCF_tabix = new File(tbi);
                 VCFParser vcfp = new VCFParser(inputVCF, inputVCF_tabix);
                 vcfp.printINFOfields();
-                break;
+                System.exit(0);
             }
 
             if( args[j].endsWith("gatk") ) {
@@ -109,8 +109,8 @@ public class globalFunctions {
                 continue;
             }
 
-            if(line.startsWith("min_sample_maf=")) {
-                required_min_sample_maf = Double.valueOf(line.substring(15));
+            if(line.startsWith("min_sample_af=")) {
+                required_min_sample_af = Double.valueOf(line.substring(15));
             }
 
             if(line.startsWith("queryMode=")) {
@@ -172,7 +172,7 @@ public class globalFunctions {
         System.err.print("inputVCF:         " + inputVCF.getCanonicalPath() + "\n");
         System.err.print("source GFF:       " + srcGFF3.getCanonicalPath() + "\n");
         System.err.print("Query mode:       " + queryMode + "\n");
-        System.err.print("Sample MAF:     < " + required_min_sample_maf + "\n");
+        System.err.print("Sample MAF:     < " + required_min_sample_af + "\n");
 
         System.err.print("Transcript model: " + outputTranscript + "\n");
         if( outputTranscript.equalsIgnoreCase("mostConserved") ) System.err.print("TIMS file:    " + TIMSfile.getName() + "\n");
@@ -210,7 +210,7 @@ public class globalFunctions {
 
         if( !inputVCF.exists() ) {
             System.err.println("\nERROR! Unable to find '" + inputVCF.getName() + "'\n");
-            System.exit(0);
+            System.exit(1);
         }
 
         // This code assumes you have have a tabix *.tbi file to go with the input VCF file.
@@ -220,29 +220,29 @@ public class globalFunctions {
                             "If you don't have it first create it with:\n" +
                             "\ttabix " + inputVCF.getName() + "\n"
             );
-            System.exit(0);
+            System.exit(1);
         }
 
         if( !srcGFF3.exists() ) {
             System.err.println("\nERROR! Unable to find '" + srcGFF3.getName() + "'\n");
-            System.exit(0);
+            System.exit(1);
         }
 
         if( outputTranscript.equalsIgnoreCase("mostConserved") &&
                 ( (null == TIMSfile) || !TIMSfile.exists() ) ) {
             System.err.println("\nERROR! You asked for the 'mostConserved' transript model output but I can't find the TIMS file\n");
-            System.exit(0);
+            System.exit(1);
         }
 
         if( null == queryMode ) {
             System.err.println("\nERROR! queryMode is not set. Must be either 'exon' or 'transcript'\n");
-            System.exit(0);
+            System.exit(1);
         }
 
         if( !queryMode.equalsIgnoreCase("transcript") &&
             !queryMode.equalsIgnoreCase("exon")) {
             System.err.println("\nERROR! queryMode must be either 'exon' or 'transcript'\n");
-            System.exit(0);
+            System.exit(1);
         }
 
 
@@ -256,12 +256,22 @@ public class globalFunctions {
         }
 
 
-        score = 0;
-        if( (null != filterDOM) && (filterDOM.length() > 0) ) score++;
-        if( (null != filterREC) && (filterREC.length() > 0) ) score++;
-        if( score == 0 ) {
-            System.err.println("\nERROR! You must provide a value for EITHER filterDOM or filterREC (or both) in the input file\n");
-            System.exit(0);
+//        score = 0;
+//        if( (null != filterDOM) && (filterDOM.length() > 0) && (genesDOM.size() > 0) ) score++;
+//        if( (null != filterREC) && (filterREC.length() > 0)  && (genesREC.size() > 0) ) score++;
+//        if( score == 0 ) {
+//            System.err.println("\nERROR! You must provide a value for EITHER filterDOM or filterREC (or both) in the input file\n");
+//            System.exit(1);
+//        }
+
+        if( (genesDOM.size() > 0) && (filterDOM.length() == 0) ) {
+            System.err.println("\nERROR! You provided " + genesDOM.size() + " DOMINANT model genes but no filter string for them.\n");
+            System.exit(1);
+        }
+
+        if( (genesREC.size() > 0) && (filterREC.length() == 0) ) {
+            System.err.println("\nERROR! You provided " + genesREC.size() + " RECESSIVE model genes but no filter string for them.\n");
+            System.exit(1);
         }
 
         checkFilterStrings(filterDOM);
@@ -327,7 +337,8 @@ public class globalFunctions {
         bw.write("\n# This is the path to the gene coordinate file to use. Must be in GFF3 format.\nsrcGFF3=\n");
         bw.write("\n# List of DOMINANT genes to report results for\ngenesDOM=\n");
         bw.write("\n# List of RECESSIVE genes to report results for\ngenesREC=\n");
-        bw.write("\n# Specify the minimum Sample minor allele frequecy (MAF) that a variant call must have in order to be reported\nmin_sample_maf=0.05");
+        bw.write("\n# Specify the minimum Sample Allele Frequecy (AF) that a variant call must have in order to be reported");
+        bw.write("\nmin_sample_af=0.05");
         bw.write("\n# Specify query method for reporting variant calls." +
                       "\n# 'transcript' = look for variants within the boundaries of a transcript" +
                       "\n# 'exon' = look for variants within the coding boundaries of exons" +
@@ -345,10 +356,10 @@ public class globalFunctions {
                       "\n# Some default filters are given below as examples of proper syntax usage." +
                       "\n# These examples assume that dbNSFP, EFF, and ESP were used to annotate the VCF\n");
         bw.write("\n# Score filters to apply to the variants in DOMINANT genes" +
-                      "\nfilterDOM=SAMPLE_MAF < 0.1 and (ESP_MAX_AA_EA < 0.005 and (( (POLYPHEN2_HVAR =~ /D/) + (MUTATIONTASTER =~ /[AD]/) + (SIFT =~ /D/) ) >= 2)) or (ESP_MAX_AA_EA < 0.005 and IS_LOF)\n");
+                      "\nfilterDOM=SAMPLE_AF < 0.1 and (ESP_MAX_AA_EA < 0.005 and (( (POLYPHEN2_HVAR =~ /D/) + (MUTATIONTASTER =~ /[AD]/) + (SIFT =~ /D/) ) >= 2)) or (ESP_MAX_AA_EA < 0.005 and IS_LOF)\n");
 
         bw.write("\n# Score filters to apply to the variants in RECESSIVE genes" +
-                      "\nfilterREC=SAMPLE_MAF < 0.1 and (ESP_MAX_AA_EA < 0.01 and (( (POLYPHEN2_HVAR =~ /D/) + (MUTATIONTASTER =~ /[AD]/) + (SIFT =~ /D/) ) >= 2)) or (ESP_MAX_AA_EA < 0.01 and IS_LOF)\n");
+                      "\nfilterREC=SAMPLE_AF < 0.1 and (ESP_MAX_AA_EA < 0.01 and (( (POLYPHEN2_HVAR =~ /D/) + (MUTATIONTASTER =~ /[AD]/) + (SIFT =~ /D/) ) >= 2)) or (ESP_MAX_AA_EA < 0.01 and IS_LOF)\n");
 
         bw.write("\n# Include data for these variants regardless of their filter scores\n" +
                 "# Variant syntax: chromosome:position\n" +
