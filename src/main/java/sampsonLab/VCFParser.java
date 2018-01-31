@@ -1,6 +1,7 @@
 package sampsonLab;
 
 import com.google.common.collect.SetMultimap;
+import com.google.errorprone.annotations.Var;
 import htsjdk.samtools.util.CloseableIterator;
 import htsjdk.variant.variantcontext.CommonInfo;
 import htsjdk.variant.variantcontext.VariantContext;
@@ -138,7 +139,7 @@ public class VCFParser {
                     }
                 }
 
-                if(VI.hasCandidateSubjects("AS")) {   // AS = Allowed Sites
+                if(VI.hasCandidateSubjects("AS", null)) {   // AS = Allowed Sites
 
                     if(null != VI.EFF) {
                         for(String curTS : VI.EFF.eff.keySet()) {
@@ -163,6 +164,8 @@ public class VCFParser {
 
         int FLANK = 2; // Allow for 2 basepairs of deviation around a variant site
         for(String geneId: geneOrder) { // Iterate over the genes in the given geneMap
+
+            ArrayList<VariantInfo> viList = new ArrayList<VariantInfo>(); // prep for this iteration
 
             for(Transcript curTS : geneMap.get(geneId)) { // Iterate over the transcripts for this gene
 
@@ -204,15 +207,25 @@ public class VCFParser {
                         VI.passesFilter(filter, curTS.getTranscriptID()); // Determine if this variant passes our filter
 
                         if(VI.passedFilter) {
-                            // The current variant passed JEXL filtering, now only report it if there is at least one sample harboring this variant.
-                            if(VI.hasCandidateSubjects(filterType)) {
-                                VI.printSummaryString(geneId, curTS.getTranscriptID());
-                            }
+                            VI.addTranscript(curTS.getTranscriptID(), curTS.getGeneName());
+                            viList.add(VI);
                         }
+
+
+//                        if(VI.passedFilter) {
+//                            // The current variant passed JEXL filtering, now only report it if there is at least one sample harboring this variant.
+//                            if(VI.hasCandidateSubjects(filterType)) {
+//                                VI.printSummaryString(geneId, curTS.getTranscriptID());
+//                            }
+//                        }
                     }
-                }
-            }
-        }
+                } // end loop over exons
+            } // end loop over transcripts
+
+            reportVariants(viList, filterType);
+            viList.clear();
+
+        } // end loop over genes
     }
 
 
@@ -223,14 +236,12 @@ public class VCFParser {
         // This command only works if you have the tabix tbi file for the input VCF
         VCFFileReader vcfr = new VCFFileReader(inputVCF, inputVCF_tabix);
 
-        //HashMap<String, ArrayList<VariantInfo> > variantMap = new HashMap<>();
-
         ArrayList<String> geneOrder = sortGenes(geneMap);
 
         int FLANK = 20;
         for(String geneId: geneOrder) { // Iterate over the genes in the given geneMap
 
-            //variantMap.put(geneId, new ArrayList<VariantInfo>()); // prep for this iteration
+            ArrayList<VariantInfo> viList = new ArrayList<VariantInfo>(); // prep for this iteration
 
             for(Transcript curTS : geneMap.get(geneId)) { // Iterate over the transcripts for this gene
 
@@ -268,16 +279,94 @@ public class VCFParser {
 
                     VI.passesFilter(filter, curTS.getTranscriptID()); // Determine if this variant passes our filter
 
-                    if (VI.passedFilter) {
-                        // The current variant passed filtering, now only report it if there is at least one sample harboring this variant.
-                        if (VI.hasCandidateSubjects(filterType)) {
-                            VI.printSummaryString(geneId, curTS.getTranscriptID());
-                        }
+                    if(VI.passedFilter) {
+                        VI.addTranscript(curTS.getTranscriptID(), curTS.getGeneName());
+                        viList.add(VI);
+                    }
+
+//                    if (VI.passedFilter) {
+//                        // The current variant passed filtering, now only report it if there is at least one sample harboring this variant.
+//                        if (VI.hasCandidateSubjects(filterType)) {
+//                            VI.printSummaryString(geneId, curTS.getTranscriptID());
+//                        }
+//                    }
+                }
+            } // end loop over transcripts
+
+            reportVariants(viList, filterType);
+            viList.clear();
+
+        } // end loop over geneIds
+    }
+
+
+
+    /*****************************************************************************************************************/
+    // Function identifies which subjects for given list of variants should be reported
+    void reportVariants(ArrayList<VariantInfo> VL, String filterType) {
+
+
+
+        if(filterType == "REC") {
+            // Determine how many recessive genes each subject has.
+            HashMap<String, Integer> numRecVariants = new HashMap<>();
+            for(VariantInfo curVariant : VL) {
+                for(String k : curVariant.genotypeMap.keySet()) numRecVariants.put(k, 0);
+            }
+
+            for(VariantInfo curVariant : VL) {
+                for(String k : curVariant.genotypeMap.keySet()) {
+                    Genotype_Feature g = curVariant.genotypeMap.get(k);
+                    if(g.genotypeInt > 0) {
+                        int n = numRecVariants.get(k) + 1;
+                        numRecVariants.put(k, n);
+                    }
+                }
+            }
+
+            for(VariantInfo curVariant : VL) {
+                boolean status = curVariant.hasCandidateSubjects("REC", numRecVariants);
+
+                if(status) {
+                    for(String curTS : curVariant.affectedTranscripts.keySet()) {
+                        String gene = curVariant.affectedTranscripts.get(curTS);
+                        curVariant.printSummaryString(gene, curTS);
                     }
                 }
             }
         }
+
+        // Compound heterozygosity doesn't apply to the dominant filter so 'numRecVariants is 'null'
+        if(filterType == "DOM") {
+            for(VariantInfo curVariant : VL) {
+                boolean status = curVariant.hasCandidateSubjects("DOM", null);
+
+                if(status) {
+                    for(String curTS : curVariant.affectedTranscripts.keySet()) {
+                        String gene = curVariant.affectedTranscripts.get(curTS);
+                        curVariant.printSummaryString(gene, curTS);
+                    }
+                }
+            }
+        }
+
+        if(filterType == "AS") {
+            for(VariantInfo curVariant : VL) {
+                boolean status = curVariant.hasCandidateSubjects("AS", null);
+
+                if(status) {
+                    for(String curTS : curVariant.affectedTranscripts.keySet()) {
+                        String gene = curVariant.affectedTranscripts.get(curTS);
+                        curVariant.printSummaryString(gene, curTS);
+                    }
+                }
+            }
+        }
+
     }
+
+
+
 
 
     /*****************************************************************************************************************/

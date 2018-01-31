@@ -30,6 +30,7 @@ public class VariantInfo {
 
     public HashMap<String, Genotype_Feature> genotypeMap; // k = sampleID, v = genotype_feature object for this subject
     public SortedSet<String> candPatients;
+    public HashMap<String, String> affectedTranscripts; // k = transcriptID, v = parent gene of transcript
 
     public HashMap<String, Object> userFeatures; // k = feature name, v = object (String, double, int, etc..)
 
@@ -61,6 +62,8 @@ public class VariantInfo {
 
         genotypeMap = new HashMap<String, Genotype_Feature>();
         candPatients = new TreeSet<String>();
+        affectedTranscripts = new HashMap<>();
+
 
         this.checkAllowedSites();
     }
@@ -82,6 +85,12 @@ public class VariantInfo {
         }
     }
 
+
+    /*********************************************************************************************/
+    // Record which transcripts this variant has an impact on
+    public void addTranscript(String tsID, String gene) {
+        affectedTranscripts.put(tsID, gene);
+    }
 
 
     /*********************************************************************************************/
@@ -182,10 +191,16 @@ public class VariantInfo {
             else this.userFeatures.put(feat, dbl2str(v, 4, false));
         }
         else if(feat.equalsIgnoreCase("IS_LOF")) {
-            if( vc.hasAttribute("LOF") ) {
-                String tmp = vc.getAttributeAsString("LOF", "#NULL");
-                if (tmp.equalsIgnoreCase("#NULL")) this.userFeatures.put(feat, false);
-                else this.userFeatures.put(feat, true);
+
+            if(null == this.EFF) {
+                String tmp = vc.getAttributeAsString("EFF", "#NULL");
+                if (tmp != "#NULL") EFF = new EFF_Features(tmp);
+            }
+
+            String ts = transcriptID.replaceAll("\\.\\d+$", "");
+            String out = EFF.findTS(ts);
+            if(out.startsWith("LOF")) {
+                this.userFeatures.put(feat, true);
             }
             else this.userFeatures.put(feat, false);
         }
@@ -336,8 +351,6 @@ public class VariantInfo {
                 this.modelType += "*";
         }
 
-        int debug = 1;
-
         for(String k : this.candPatients) {
             Genotype_Feature gf = genotypeMap.get(k);
             ArrayList<String> ary = new ArrayList<String>();
@@ -409,7 +422,7 @@ public class VariantInfo {
 
     /*********************************************************************************************/
     // Function returns true if at least 1 subject in the genotypeMap meets the filtering requirements for this variant
-    public boolean hasCandidateSubjects(String filterType) {
+    public boolean hasCandidateSubjects(String filterType, HashMap<String, Integer> numRecVariants) {
         boolean ret = false;
 
         for(Genotype_Feature g : genotypeMap.values()) {
@@ -420,9 +433,18 @@ public class VariantInfo {
             // Keep subjects that are HET or HOM_ALT
             if( filterType.equalsIgnoreCase("DOM") && (g.genotypeInt > 0) ) candPatients.add(g.sampleID);
 
-            // the filter is for recessive variants
-            // Keep subjects that are HOM_ALT
-            if( filterType.equalsIgnoreCase("REC") && (g.genotypeInt == 2) ) candPatients.add(g.sampleID);
+            // The filter is for recessive variants
+            // Keep subjects that are HOM_ALT **OR**
+            // Who are HET and have at least 2 recessive variants that are HOM_ALT or HET
+            if( filterType.equalsIgnoreCase("REC") ) {
+
+                int numREC_het = numRecVariants.get(g.sampleID);
+
+                if(g.genotypeInt == 2) candPatients.add(g.sampleID);
+                else if( (g.genotypeInt == 1) && (numREC_het > 1) ) candPatients.add(g.sampleID);
+            }
+            //if( filterType.equalsIgnoreCase("REC") && (g.genotypeInt == 2) ) candPatients.add(g.sampleID);
+
 
             // This is an allowed site outside
             if( filterType.equalsIgnoreCase("AS") && this.allowedSite && (g.genotypeInt > 0) ) candPatients.add(g.sampleID);

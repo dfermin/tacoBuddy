@@ -37,6 +37,20 @@ public class EFF_Features extends FeatureClass {
             .put("Val", "V")
             .build();
 
+    // This a list that contains terms that lead to a loss of function (LOF)
+    // in a gene because of a variant. If the annotation label is from this list,
+    // we keep the variant on first pass.
+    static final List<String> lossOfFunctionLabels = Arrays.asList(
+            "exon_loss",
+            "frameshift",
+            "rare_amino_acid",
+            "splice_acceptor",
+            "splice_donor",
+            "start_lost",
+            "stop_gained",
+            "stop_lost",
+            "transcript_ablation");
+
     public EFF_Features(String ss) {
 
         eff = new HashMap<String, String>();
@@ -55,12 +69,15 @@ public class EFF_Features extends FeatureClass {
             String label = tmpAry[0].substring(0,tmpAry[0].indexOf('(')).trim(); // gets the "assigned effect" of this variant on the given gene.
             label = label.replaceAll("_variant", "");
 
+            // MODIFIER's don't have an impact the gene product so skip them
+            if(label.equalsIgnoreCase("MODIFIER")) continue;
+
             String transId = "";
             String protAA = "#NULL";
             String impactValue = "#NULL";
             for(int j = 0; j < tmpAry.length; j++) {
 
-                if( j == 0 ) { //should be the impact of this variant according to http://snpeff.sourceforge.net/VCFannotationformat_v1.0.pdf
+                if( j == 0 ) { // should be the impact of this variant according to http://snpeff.sourceforge.net/VCFannotationformat_v1.0.pdf
                     impactValue = tmpAry[j].split("\\(")[1];
                     continue;
                 }
@@ -74,7 +91,12 @@ public class EFF_Features extends FeatureClass {
             }
 
             if(transId.startsWith("ENST00")) {
-                eff.put(transId, label);
+                if(lossOfFunctionLabels.contains(label)) {
+                    String tmp = "LOF>>" + label;
+                    eff.put(transId, tmp);
+                }
+                else eff.put(transId, label);
+
                 protChange.put(transId, protAA);
 
                 if(impactValue.equalsIgnoreCase("HIGH")) impactMap.put(transId, 3);
@@ -154,7 +176,8 @@ public class EFF_Features extends FeatureClass {
 
         if(eff.containsKey(search_str.replaceAll("\\.\\d+$", ""))) {
             ret = eff.get(search_str);
-            ret += ":" + protChange.get(search_str) + ":" + impactNum2str(search_str);
+            if( !ret.startsWith("LOF") )
+                ret += ":" + protChange.get(search_str) + ":" + impactNum2str(search_str);
         }
         return ret;
     }
@@ -162,19 +185,19 @@ public class EFF_Features extends FeatureClass {
 
     // Function iterates over the values in 'eff' and concatenates the unique ones into an array
     // that jexl can interpret. This function is for gene-level output.
-    public String returnJexlArray() {
-        String ret = "";
-        SortedSet<String> SS = new TreeSet<String>();
-
-        for(String v : eff.values()) {
-
-            for(String i : v.split(",")) {
-                i = "'" + i.trim() + "'";
-                SS.add(i);
-            }
-        }
-
-        ret = "[" + Joiner.on(",").join(SS) + "]";
-        return ret;
-    }
+//    public String returnJexlArray() {
+//        String ret = "";
+//        SortedSet<String> SS = new TreeSet<String>();
+//
+//        for(String v : eff.values()) {
+//
+//            for(String i : v.split(",")) {
+//                i = "'" + i.trim() + "'";
+//                SS.add(i);
+//            }
+//        }
+//
+//        ret = "[" + Joiner.on(",").join(SS) + "]";
+//        return ret;
+//    }
 }
